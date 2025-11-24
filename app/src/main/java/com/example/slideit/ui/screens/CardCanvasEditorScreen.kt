@@ -5,13 +5,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -20,11 +16,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -42,9 +36,6 @@ import com.example.slideit.viewmodel.CardViewModel
 import com.example.slideit.ui.components.CanvasElementView
 import kotlinx.coroutines.launch
 
-/**
- * 캔버스 명함 에디터 화면
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CardCanvasEditorScreen(
@@ -58,22 +49,12 @@ fun CardCanvasEditorScreen(
 ) {
     val context = LocalContext.current
     val backgroundColor by canvasViewModel.backgroundColor.collectAsStateWithLifecycle()
-    val selectedElementId by canvasViewModel.selectedElementId.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
 
     var showTextDialog by remember { mutableStateOf(false) }
     var showShapeMenu by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
-    var editingElement by remember { mutableStateOf<CanvasElement?>(null) }
 
-    // 기본 명함 정보
-    var name by remember { mutableStateOf(cardToEdit?.name ?: "") }
-    var position by remember { mutableStateOf(cardToEdit?.position ?: "") }
-    var company by remember { mutableStateOf(cardToEdit?.company ?: "") }
-    var phone by remember { mutableStateOf(cardToEdit?.phone ?: "") }
-    var email by remember { mutableStateOf(cardToEdit?.email ?: "") }
-
-    // 이미지 피커
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -82,7 +63,6 @@ fun CardCanvasEditorScreen(
         }
     }
 
-    // cardToEdit가 있고 Canvas 데이터가 있으면 복원
     LaunchedEffect(cardToEdit) {
         cardToEdit?.canvasData?.let { jsonData ->
             val canvasData = CanvasCardData.fromJson(jsonData)
@@ -111,15 +91,17 @@ fun CardCanvasEditorScreen(
                     }
                 },
                 actions = {
-                    // 저장 버튼
                     IconButton(
                         onClick = {
                             coroutineScope.launch {
+                                // Elements are now handled directly in portrait coordinates
+                                val portraitElements = canvasViewModel.toCardElements()
+                                
                                 val canvasData = CanvasCardData(
-                                    elements = canvasViewModel.toCardElements(),
+                                    elements = portraitElements,
                                     backgroundColor = backgroundColor,
-                                    width = 1080f,
-                                    height = 680f
+                                    width = 680f, // Portrait width
+                                    height = 1080f // Portrait height
                                 )
 
                                 val cardToSave = cardToEdit?.copy(
@@ -145,6 +127,7 @@ fun CardCanvasEditorScreen(
                                 cardViewModel.insertCard(cardToSave)
 
                                 if (isMyCard) {
+                                    cardViewModel.refreshMyCard()
                                     onSaveMyCard()
                                 } else {
                                     onNavigateBack()
@@ -171,7 +154,7 @@ fun CardCanvasEditorScreen(
                 onAddShape = { showShapeMenu = true },
                 onChangeBackground = { showColorPicker = true },
                 onDeleteSelected = { canvasViewModel.deleteSelectedElement() },
-                hasSelection = selectedElementId != null
+                hasSelection = canvasViewModel.selectedElementId.collectAsStateWithLifecycle().value != null
             )
         }
     ) { padding ->
@@ -190,7 +173,6 @@ fun CardCanvasEditorScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // 캔버스 영역
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -199,15 +181,12 @@ fun CardCanvasEditorScreen(
             ) {
                 CanvasArea(
                     viewModel = canvasViewModel,
-                    onElementSelected = { element ->
-                        editingElement = element
-                    }
+                    onElementSelected = { }
                 )
             }
         }
     }
 
-    // 텍스트 추가 다이얼로그
     if (showTextDialog) {
         TextInputDialog(
             onDismiss = { showTextDialog = false },
@@ -222,7 +201,6 @@ fun CardCanvasEditorScreen(
         )
     }
 
-    // 도형 선택 메뉴
     if (showShapeMenu) {
         ShapeSelectionDialog(
             onDismiss = { showShapeMenu = false },
@@ -236,7 +214,6 @@ fun CardCanvasEditorScreen(
         )
     }
 
-    // 배경 색상 선택
     if (showColorPicker) {
         BackgroundColorDialog(
             currentColor = backgroundColor,
@@ -249,13 +226,10 @@ fun CardCanvasEditorScreen(
     }
 }
 
-/**
- * 캔버스 영역
- */
 @Composable
 fun CanvasArea(
     viewModel: CanvasEditorViewModel,
-    onElementSelected: (CanvasElement) -> Unit = {}
+    onElementSelected: (CanvasElement) -> Unit
 ) {
     val backgroundColor by viewModel.backgroundColor.collectAsStateWithLifecycle()
     val selectedElementId by viewModel.selectedElementId.collectAsStateWithLifecycle()
@@ -263,20 +237,18 @@ fun CanvasArea(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .aspectRatio(1.588f)
+            .aspectRatio(680f / 1080f) // Editor is portrait
             .clip(RoundedCornerShape(16.dp))
             .background(Color(backgroundColor))
             .border(2.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = {
-                        // 캔버스 빈 공간 클릭 시 선택 해제
                         viewModel.deselectElement()
                     }
                 )
             }
     ) {
-        // 모든 요소 렌더링
         viewModel.elements.forEach { element ->
             CanvasElementView(
                 element = element,
@@ -287,17 +259,21 @@ fun CanvasArea(
                 },
                 onMove = { offset ->
                     viewModel.moveElement(element.id, offset)
+                },
+                onResize = { dragAmount ->
+                    viewModel.resizeElement(element.id, dragAmount)
+                },
+                onRotate = { newRotation ->
+                    viewModel.rotateElement(element.id, newRotation)
+                },
+                onRotateBy = { delta ->
+                    viewModel.rotateElementBy(element.id, delta)
                 }
             )
         }
     }
 }
 
-
-
-/**
- * 하단 툴바
- */
 @Composable
 fun CanvasToolbar(
     onAddText: () -> Unit,
@@ -319,26 +295,10 @@ fun CanvasToolbar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ToolbarButton(
-                icon = Icons.Default.TextFields,
-                label = "텍스트",
-                onClick = onAddText
-            )
-            ToolbarButton(
-                icon = Icons.Default.Image,
-                label = "이미지",
-                onClick = onAddImage
-            )
-            ToolbarButton(
-                icon = Icons.Default.Square,
-                label = "도형",
-                onClick = onAddShape
-            )
-            ToolbarButton(
-                icon = Icons.Default.Palette,
-                label = "배경",
-                onClick = onChangeBackground
-            )
+            ToolbarButton(icon = Icons.Default.TextFields, label = "텍스트", onClick = onAddText)
+            ToolbarButton(icon = Icons.Default.Image, label = "이미지", onClick = onAddImage)
+            ToolbarButton(icon = Icons.Default.Square, label = "도형", onClick = onAddShape)
+            ToolbarButton(icon = Icons.Default.Palette, label = "배경", onClick = onChangeBackground)
             ToolbarButton(
                 icon = Icons.Default.Delete,
                 label = "삭제",
@@ -350,9 +310,6 @@ fun CanvasToolbar(
     }
 }
 
-/**
- * 툴바 버튼
- */
 @Composable
 fun ToolbarButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -382,9 +339,6 @@ fun ToolbarButton(
     }
 }
 
-/**
- * 텍스트 입력 다이얼로그
- */
 @Composable
 fun TextInputDialog(
     onDismiss: () -> Unit,
@@ -431,9 +385,6 @@ fun TextInputDialog(
     )
 }
 
-/**
- * 도형 선택 다이얼로그
- */
 @Composable
 fun ShapeSelectionDialog(
     onDismiss: () -> Unit,
@@ -467,9 +418,6 @@ fun ShapeSelectionDialog(
     )
 }
 
-/**
- * 배경 색상 선택 다이얼로그
- */
 @Composable
 fun BackgroundColorDialog(
     currentColor: Long,

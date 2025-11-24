@@ -36,7 +36,7 @@ interface BusinessCardDao {
     /**
      * 내 명함 중 첫 번째 조회 (공유용)
      */
-    @Query("SELECT * FROM business_cards WHERE isMyCard = 1 ORDER BY createdAt DESC LIMIT 1")
+    @Query("SELECT * FROM business_cards WHERE isMyCard = 1 ORDER BY lastModifiedAt DESC LIMIT 1")
     fun getFirstMyCard(): Flow<BusinessCard?>
 
     /**
@@ -98,6 +98,9 @@ interface BusinessCardDao {
      */
     @Query("SELECT DISTINCT category FROM business_cards WHERE category != '' ORDER BY category")
     fun getAllCategories(): Flow<List<String>>
+
+    @Query("UPDATE business_cards SET isMyCard = 0 WHERE isMyCard = 1 AND id != :currentMyCardId")
+    suspend fun unselectOtherMyCards(currentMyCardId: String)
 
     /**
      * 즐겨찾기 토글

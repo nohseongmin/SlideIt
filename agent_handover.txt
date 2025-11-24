@@ -1,0 +1,45 @@
+# Agent Handover Document: SlideIT Android App
+
+## 1. Project Goal
+The user wants to improve the canvas-based business card editor in the "SlideIT" Android application. The initial request was to add more sophisticated editing features like resize/rotation handles. Subsequent requests focused on fixing a cascade of bugs related to UI behavior and data persistence.
+
+## 2. Final Implementation State (Current Codebase)
+After numerous attempts to fix persistent bugs, the codebase was intentionally reverted to a simpler, more stable architecture.
+
+*   **Editor UI:** The canvas editor (`CardCanvasEditorScreen.kt`) is now a **portrait-oriented, WYSIWYG (What You See Is What You Get) editor**. The editor's canvas has a portrait aspect ratio (`680f / 1080f`) that directly matches the final card's data model. The previous, complex attempts to create a landscape editor have been abandoned due to intractable bugs.
+*   **Coordinate System:** All coordinate systems (editor, saved data, renderer) are now unified to a single **portrait (680x1080)** system. This eliminates the need for complex landscape-to-portrait transformations, which were a major source of bugs. The ViewModel (`CanvasEditorViewModel.kt`) now only converts absolute Dp-based coordinates to relative (percentage) values for storage and back.
+*   **Rotation Logic:** Element rotation is handled by a **delta-based update mechanism**. The `CanvasEditorViewModel` has a `rotateElementBy(delta: Float)` function, which is called by the rotation handle gesture in `CanvasComponents.kt`. This was implemented to fix a "snapping back" bug caused by state update race conditions.
+*   **Data Update on Save:** The persistent bug where the share screen would not update after a save is addressed with a **manual refresh trigger**.
+    *   `CardViewModel.kt` has a `refreshMyCard()` function that increments a `MutableStateFlow` trigger.
+    *   The `firstMyCard` `Flow` is reconstructed using `flatMapLatest` whenever this trigger is fired.
+    *   `CardCanvasEditorScreen.kt` calls `refreshMyCard()` right before navigating away after a save, forcing the `CardShareScreen` to re-fetch the latest card data from the database.
+*   **Crash on Save:** A crash (`IllegalStateException: View not attached to a window`) was occurring due to an attempt to render a Composable to a bitmap off-screen (`save-to-image` feature). This feature has been **completely removed**. The app now relies on live rendering via `CardRenderer`, and the `try-catch(Throwable)` block for the image generation has been removed along with the feature.
+*   **Rendering:** The `CardRenderer.kt` was corrected to handle `Dp` vs. `Pixel` unit inconsistencies, which was the final fix for the "white screen" bug where only the background would render. It now correctly calculates element positions and sizes in `Dp` based on the incoming relative data.
+
+## 3. Key Issues & Debugging History
+
+### 3.1. Core Problem: Share Screen Not Updating ("White Screen" Bug)
+*   **Symptom:** After saving an edited card, the `CardShareScreen` would show the old version of the card or, more frequently, just a white background.
+*   **Analysis & Attempts:**
+    1.  **Initial Fix:** Corrected the DAO query from `ORDER BY createdAt` to `ORDER BY lastModifiedAt` to fetch the most recently edited card. This was a necessary but insufficient fix.
+    2.  **Single "My Card" Logic:** Implemented logic to ensure only one card could have `isMyCard = true` at a time, to prevent the `LIMIT 1` query from fetching the wrong card. This was also insufficient.
+    3.  **Save-to-Image Feature (Failed Attempt):** To bypass live rendering issues, I implemented a feature to save the card as a static PNG and display that image. This caused an `IllegalStateException` because an off-screen `ComposeView` cannot be rendered without being attached to a window. Wrapping this in `try-catch` prevented the app crash but resulted in a `null` thumbnail path, causing a fallback to the buggy live renderer, which explained the persistent "white screen". **This feature was abandoned and removed.**
+    4.  **DP vs Pixel Rendering Bug (Likely Root Cause):** Discovered that `CardRenderer` was calculating coordinates in pixels but `CanvasElementView` was interpreting them as Dp, rendering elements massively oversized and off-screen. I overwrote `CardRenderer.kt` to fix this unit mismatch.
+    5.  **Data Inconsistency (Fixed):** At one point, the ViewModel was saving portrait-transformed element data inside a `CanvasCardData` object marked with landscape dimensions. This was fixed by ensuring the `CanvasCardData` is always saved with portrait dimensions (`680x1080`).
+    6.  **Final Solution:** The combination of fixing the `CardRenderer` DP/Pixel bug, reverting to a simple portrait coordinate system, and using the `refreshMyCard()` manual trigger should now correctly solve this issue.
+
+### 3.2. UI Interaction Bugs (Rotation & Movement)
+*   **Symptom 1 (Rotation):** Rotating an element felt jerky and would "snap back" to its original orientation during a drag gesture.
+*   **Analysis:** This was a classic state-update race condition. The drag gesture events were firing faster than the UI could recompose, so each new event was calculating its delta from a stale rotation value.
+*   **Solution:** Implemented `rotateElementBy(delta: Float)` in the ViewModel and `onRotateBy` callbacks. This ensures each drag event applies a small delta to the *current* state in the ViewModel, resulting in smooth rotation. This logic is correct in the final version of the code.
+
+*   **Symptom 2 (Movement):** When a landscape editor was attempted, dragging an element left on the screen would move it unintuitively (e.g., up or down) in the editor.
+*   **Analysis:** This was caused by the `graphicsLayer { rotationZ = 90f }` applied to the canvas. The drag events were in the screen's coordinate system, but the element's position was in the rotated canvas's coordinate system.
+*   **Solution:** The entire landscape editor concept was **abandoned**. By making the editor a simple portrait WYSIWYG view, the screen's coordinate system and the canvas's coordinate system are aligned, and movement is now 1-to-1 and intuitive.
+
+## 4. Suggestions for the Next Agent
+1.  **Start from the current state.** The codebase, as produced by my last `write_file` commands, represents a stable baseline. The complex, error-prone features (landscape editor, save-to-image) have been removed in favor of a simpler, more robust WYSIWYG portrait editor.
+2.  **Verify the "White Screen" Fix.** The primary remaining bug is the "white screen," which I believe was caused by the DP vs. Pixel unit error in `CardRenderer.kt`. The first step should be to run the app and confirm if saving a card now results in the elements being rendered correctly on the share screen. If it still fails, the problem lies deeper in the rendering pipeline than I was able to diagnose.
+3.  **Do Not Re-introduce Save-to-Image (Unless Solved).** Do not attempt to re-implement the feature of rendering a composable to a bitmap using a raw `ComposeView`. It will fail with the `IllegalStateException` unless you properly attach the view to the window manager, which is a complex and risky operation. If this feature is a hard requirement, research and use a dedicated library like `Shot` or `Roborazzi` for inspiration on how to host a composable for off-screen rendering.
+4.  **Confirm Rotation is Fixed.** The delta-based rotation (`rotateElementBy`) is the correct pattern and should be working. Verify this in testing.
+5.  **Holistic Approach.** This series of bugs has demonstrated that small, targeted fixes can have unintended cascading consequences. The problem was only understood after reviewing the entire data flow from editor to renderer. Continue with this holistic view. The bug is not in one line, but in the interaction between multiple components.

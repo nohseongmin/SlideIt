@@ -36,7 +36,11 @@ class CardViewModel(application: Application) : AndroidViewModel(application) {
     val receivedCards: Flow<List<BusinessCard>>
 
     // 내 명함 (공유용)
-    val firstMyCard: Flow<BusinessCard?>
+    private val _refreshTrigger = MutableStateFlow(0)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val firstMyCard: Flow<BusinessCard?> = _refreshTrigger.flatMapLatest {
+        repository.getFirstMyCard()
+    }
 
     // 검색 쿼리
     private val _searchQuery = MutableStateFlow("")
@@ -65,7 +69,13 @@ class CardViewModel(application: Application) : AndroidViewModel(application) {
         allCards = repository.getAllCards()
         myCards = repository.getMyCards()
         receivedCards = repository.getReceivedCards()
-        firstMyCard = repository.getFirstMyCard()
+    }
+
+    /**
+     * 내 명함 데이터 강제 새로고침
+     */
+    fun refreshMyCard() {
+        _refreshTrigger.value++
     }
 
     /**
@@ -79,6 +89,9 @@ class CardViewModel(application: Application) : AndroidViewModel(application) {
      * 명함 추가
      */
     suspend fun insertCard(card: BusinessCard) {
+        if (card.isMyCard) {
+            repository.unselectOtherMyCards(card.id)
+        }
         repository.insertCard(card)
     }
 

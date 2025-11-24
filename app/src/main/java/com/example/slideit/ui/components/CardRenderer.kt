@@ -1,6 +1,7 @@
 package com.example.slideit.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -13,6 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -115,7 +117,6 @@ fun SimpleCardRenderer(
                 cameraDistance = 12f * density
             }
     ) {
-        // 명함 베이스
         Card(
             modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(16.dp),
@@ -127,7 +128,6 @@ fun SimpleCardRenderer(
             )
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // 홀로그래픽 레인보우 효과
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -136,18 +136,16 @@ fun SimpleCardRenderer(
                             Brush.radialGradient(
                                 colors = listOf(
                                     Color.White.copy(alpha = 0.5f),
-                                    Color(0xFFE0F7FA).copy(alpha = 0.3f), // Light Cyan
-                                    Color(0xFFF3E5F5).copy(alpha = 0.2f), // Light Purple
-                                    Color(0xFFFFF9C4).copy(alpha = 0.2f), // Light Yellow
+                                    Color(0xFFE0F7FA).copy(alpha = 0.3f), 
+                                    Color(0xFFF3E5F5).copy(alpha = 0.2f), 
+                                    Color(0xFFFFF9C4).copy(alpha = 0.2f), 
                                     Color.Transparent
                                 ),
-                                center = Offset(glareX / 100f * 400, glareY / 100f * 600), // Adjust multiplier for effect
+                                center = Offset(glareX / 100f * 400, glareY / 100f * 600),
                                 radius = 350f
                             )
                         )
                 )
-
-                // 명함 내용
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -157,10 +155,8 @@ fun SimpleCardRenderer(
                         }
                 ) {
                     if (showRotated) {
-                        // 90도 회전된 레이아웃 (명함 공유 화면용)
                         RotatedCardContent(card)
                     } else {
-                        // 일반 레이아웃 (명함 보관함용)
                         NormalCardContent(card)
                     }
                 }
@@ -169,9 +165,6 @@ fun SimpleCardRenderer(
     }
 }
 
-/**
- * 90도 회전된 명함 내용 (명함 공유 화면용)
- */
 @Composable
 private fun RotatedCardContent(card: BusinessCard) {
     Row(
@@ -184,38 +177,21 @@ private fun RotatedCardContent(card: BusinessCard) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 좌측 - 이름 및 직책
         Column(
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = card.name,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(card.textColor),
-                letterSpacing = 0.5.sp
-            )
+            Text(text = card.name, fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(card.textColor), letterSpacing = 0.5.sp)
             if (card.position.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = card.position,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(card.textColor).copy(alpha = 0.8f)
-                )
+                Text(text = card.position, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = Color(card.textColor).copy(alpha = 0.8f))
             }
             if (card.department.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = card.department,
-                    fontSize = 16.sp,
-                    color = Color(card.textColor).copy(alpha = 0.7f)
-                )
+                Text(text = card.department, fontSize = 16.sp, color = Color(card.textColor).copy(alpha = 0.7f))
             }
         }
 
-        // 중앙 구분선
         Box(
             modifier = Modifier
                 .width(1.dp)
@@ -231,67 +207,27 @@ private fun RotatedCardContent(card: BusinessCard) {
                 )
         )
 
-        // 우측 - 연락처 및 회사명
         Column(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = card.company,
-                fontSize = 14.sp,
-                color = Color(card.textColor).copy(alpha = 0.6f),
-                letterSpacing = 1.sp,
-                fontWeight = FontWeight.Medium
-            )
-
+            Text(text = card.company, fontSize = 14.sp, color = Color(card.textColor).copy(alpha = 0.6f), letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
             Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "M",
-                    fontSize = 12.sp,
-                    color = Color(card.textColor).copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.width(14.dp)
-                )
+            Row(horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "M", fontSize = 12.sp, color = Color(card.textColor).copy(alpha = 0.6f), fontWeight = FontWeight.Medium, modifier = Modifier.width(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = card.phone,
-                    fontSize = 13.sp,
-                    color = Color(card.textColor).copy(alpha = 0.9f)
-                )
+                Text(text = card.phone, fontSize = 13.sp, color = Color(card.textColor).copy(alpha = 0.9f))
             }
-
             Spacer(modifier = Modifier.height(6.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "E",
-                    fontSize = 12.sp,
-                    color = Color(card.textColor).copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.width(14.dp)
-                )
+            Row(horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "E", fontSize = 12.sp, color = Color(card.textColor).copy(alpha = 0.6f), fontWeight = FontWeight.Medium, modifier = Modifier.width(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = card.email,
-                    fontSize = 13.sp,
-                    color = Color(card.textColor).copy(alpha = 0.9f)
-                )
+                Text(text = card.email, fontSize = 13.sp, color = Color(card.textColor).copy(alpha = 0.9f))
             }
         }
     }
 }
 
-/**
- * 일반 명함 내용 (명함 보관함용)
- */
 @Composable
 private fun NormalCardContent(card: BusinessCard) {
     Column(
@@ -300,101 +236,62 @@ private fun NormalCardContent(card: BusinessCard) {
             .padding(16.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // 상단 - 이름 및 직책
         Column {
-            Text(
-                text = card.name,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(card.textColor)
-            )
+            Text(text = card.name, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(card.textColor))
             if (card.position.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = card.position,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(card.textColor).copy(alpha = 0.8f)
-                )
+                Text(text = card.position, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(card.textColor).copy(alpha = 0.8f))
             }
             if (card.department.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = card.department,
-                    fontSize = 12.sp,
-                    color = Color(card.textColor).copy(alpha = 0.7f)
-                )
+                Text(text = card.department, fontSize = 12.sp, color = Color(card.textColor).copy(alpha = 0.7f))
             }
         }
 
-        // 하단 - 연락처 및 회사명
         Column {
-            Text(
-                text = card.company,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(card.textColor).copy(alpha = 0.8f)
-            )
+            Text(text = card.company, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(card.textColor).copy(alpha = 0.8f))
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = card.phone,
-                fontSize = 11.sp,
-                color = Color(card.textColor).copy(alpha = 0.9f)
-            )
+            Text(text = card.phone, fontSize = 11.sp, color = Color(card.textColor).copy(alpha = 0.9f))
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = card.email,
-                fontSize = 11.sp,
-                color = Color(card.textColor).copy(alpha = 0.9f)
-            )
+            Text(text = card.email, fontSize = 11.sp, color = Color(card.textColor).copy(alpha = 0.9f))
         }
     }
 }
 
-/**
- * Canvas 기반 명함 렌더러
- */
 @Composable
 fun CanvasCardRenderer(
     card: BusinessCard,
     modifier: Modifier = Modifier,
-    cardWidth: Dp = 340.dp,
-    rotationX: Float = 0f,
-    rotationY: Float = 0f,
-    glareX: Float = 50f,
-    glareY: Float = 50f,
-    glareOpacity: Float = 0f,
-    showRotated: Boolean = false
+    cardWidth: Dp,
+    rotationX: Float,
+    rotationY: Float,
+    glareX: Float,
+    glareY: Float,
+    glareOpacity: Float,
+    showRotated: Boolean
 ) {
     val canvasData = card.canvasData?.let { CanvasCardData.fromJson(it) }
 
     if (canvasData == null) {
-        // 데이터가 없거나 파싱 실패 시 Simple 렌더러로 대체
-        SimpleCardRenderer(
-            card = card,
-            modifier = modifier,
-            cardWidth = cardWidth,
-            rotationX = rotationX,
-            rotationY = rotationY,
-            glareX = glareX,
-            glareY = glareY,
-            glareOpacity = glareOpacity,
-            showRotated = showRotated
-        )
+        SimpleCardRenderer(card = card, modifier = modifier, cardWidth = cardWidth, rotationX = rotationX, rotationY = rotationY, glareX = glareX, glareY = glareY, glareOpacity = glareOpacity, showRotated = showRotated)
         return
     }
 
+    val cardRenderWidth = cardWidth
+    val cardRenderHeight = (cardWidth.value * (canvasData.height / canvasData.width)).dp
+    val density = LocalDensity.current
+
     Box(
         modifier = modifier
-            .width(cardWidth)
-            .aspectRatio(if (showRotated) canvasData.height / canvasData.width else canvasData.width / canvasData.height)
+            .width(cardRenderWidth)
+            .height(cardRenderHeight)
             .graphicsLayer {
                 this.rotationX = rotationX
                 this.rotationY = rotationY
-                if(showRotated) {
+                if (showRotated) {
                     this.rotationZ = 90f
                 }
-                cameraDistance = 12f * density
+                cameraDistance = 12f * density.density // Use density.density
                 clip = false
             }
     ) {
@@ -405,38 +302,45 @@ fun CanvasCardRenderer(
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // 홀로그래픽 레인보우 효과
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer { alpha = glareOpacity }
                         .background(
                             Brush.radialGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.5f),
-                                    Color(0xFFE0F7FA).copy(alpha = 0.3f), // Light Cyan
-                                    Color(0xFFF3E5F5).copy(alpha = 0.2f), // Light Purple
-                                    Color(0xFFFFF9C4).copy(alpha = 0.2f), // Light Yellow
-                                    Color.Transparent
-                                ),
+                                colors = listOf(Color.White.copy(alpha = 0.5f), Color(0xFFE0F7FA).copy(alpha = 0.3f), Color(0xFFF3E5F5).copy(alpha = 0.2f), Color(0xFFFFF9C4).copy(alpha = 0.2f), Color.Transparent),
                                 center = Offset(glareX / 100f * canvasData.width, glareY / 100f * canvasData.height),
                                 radius = canvasData.width / 2f
                             )
                         )
                 )
 
-                // 캔버스 요소 렌더링
                 canvasData.elements.forEach { cardElement ->
+                    // Calculate element dimensions in Dp
+                    val elementXOffsetDp = cardRenderWidth * cardElement.x
+                    val elementYOffsetDp = cardRenderHeight * cardElement.y
+                    val elementWidthDp = cardRenderWidth * cardElement.width
+                    val elementHeightDp = cardRenderHeight * cardElement.height
+                    
+                    val fontSize = if (cardElement is CardElement.TextElement) {
+                        cardElement.fontSize * (elementWidthDp.value / 680f) // Scale font relative to the original card width (680f)
+                    } else {
+                        16f // Default font size for non-text elements (should not be used)
+                    }
+
                     val canvasElement = when (cardElement) {
-                        is CardElement.TextElement -> CanvasElement(id = cardElement.id, type = ElementType.TEXT, position = Offset(cardElement.x, cardElement.y), size = Offset(cardElement.width, cardElement.height), rotation = cardElement.rotation, text = cardElement.text, fontSize = cardElement.fontSize, color = cardElement.color)
-                        is CardElement.ImageElement -> CanvasElement(id = cardElement.id, type = ElementType.IMAGE, position = Offset(cardElement.x, cardElement.y), size = Offset(cardElement.width, cardElement.height), rotation = cardElement.rotation, imageUri = cardElement.imageUri)
-                        is CardElement.ShapeElement -> CanvasElement(id = cardElement.id, type = ElementType.SHAPE, position = Offset(cardElement.x, cardElement.y), size = Offset(cardElement.width, cardElement.height), rotation = cardElement.rotation, shapeType = cardElement.shapeType, color = cardElement.fillColor)
+                        is CardElement.TextElement -> CanvasElement(id = cardElement.id, type = ElementType.TEXT, position = Offset(elementXOffsetDp.value, elementYOffsetDp.value), size = Offset(elementWidthDp.value, elementHeightDp.value), rotation = cardElement.rotation, text = cardElement.text, fontSize = fontSize, color = cardElement.color)
+                        is CardElement.ImageElement -> CanvasElement(id = cardElement.id, type = ElementType.IMAGE, position = Offset(elementXOffsetDp.value, elementYOffsetDp.value), size = Offset(elementWidthDp.value, elementHeightDp.value), rotation = cardElement.rotation, imageUri = cardElement.imageUri)
+                        is CardElement.ShapeElement -> CanvasElement(id = cardElement.id, type = ElementType.SHAPE, position = Offset(elementXOffsetDp.value, elementYOffsetDp.value), size = Offset(elementWidthDp.value, elementHeightDp.value), rotation = cardElement.rotation, shapeType = cardElement.shapeType, color = cardElement.fillColor)
                     }
                     CanvasElementView(
                         element = canvasElement,
                         isSelected = false,
                         onSelect = {},
-                        onMove = {}
+                        onMove = {},
+                        onResize = {},
+                        onRotate = {},
+                        onRotateBy = {}
                     )
                 }
             }

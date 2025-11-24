@@ -3,7 +3,20 @@
     "allow": [
       "Bash(cmd /c:*)",
       "Bash(cat:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git reset:*)",
+      "Bash(git commit:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:img.ly)",
+      "WebFetch(domain:www.uptech.team)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(./gradlew:*)",
+      "Bash(del nul)",
+      "Bash(git restore:*)",
+      "Bash(.gitignore)"
     ],
     "deny": [],
     "ask": []

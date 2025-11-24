@@ -50,6 +50,11 @@ class BusinessCardRepository(private val dao: BusinessCardDao) {
     suspend fun insertCards(cards: List<BusinessCard>) = dao.insertCards(cards)
 
     /**
+     * 다른 '내 명함'을 모두 해제
+     */
+    suspend fun unselectOtherMyCards(currentMyCardId: String) = dao.unselectOtherMyCards(currentMyCardId)
+
+    /**
      * 명함 수정
      */
     suspend fun updateCard(card: BusinessCard) = dao.updateCard(card)

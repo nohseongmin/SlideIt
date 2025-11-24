@@ -19,14 +19,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.slideit.data.model.CanvasElement
 import com.example.slideit.data.model.ElementType
 import com.example.slideit.data.model.ShapeType
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * 캔버스 요소 뷰
@@ -36,8 +40,13 @@ fun BoxScope.CanvasElementView(
     element: CanvasElement,
     isSelected: Boolean,
     onSelect: () -> Unit,
-    onMove: (Offset) -> Unit
+    onMove: (Offset) -> Unit,
+    onResize: (Offset) -> Unit,
+    onRotate: (Float) -> Unit,
+    onRotateBy: (Float) -> Unit
 ) {
+    val density = LocalDensity.current
+
     Box(
         modifier = Modifier
             .offset(element.position.x.dp, element.position.y.dp)
@@ -100,10 +109,79 @@ fun BoxScope.CanvasElementView(
                 AsyncImage(
                     model = element.imageUri,
                     contentDescription = "Canvas Image",
-                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop
                 )
             }
         }
+        if (isSelected) {
+            val handleOffset = (-30).dp
+            val handleSize = 24.dp
+            val leverArm = with(density) { element.size.y.dp.toPx() / 2 + handleOffset.toPx().let { if (it < 0) -it else it } + handleSize.toPx() / 2 }
+
+            RotationHandle(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = handleOffset),
+                onDrag = { dragAmount ->
+                     if (leverArm > 0) {
+                        val rotationInRadians = Math.toRadians(element.rotation.toDouble())
+                        val cosVal = cos(rotationInRadians)
+                        val sinVal = sin(rotationInRadians)
+
+                        val localDragX = dragAmount.x * cosVal + dragAmount.y * sinVal
+
+                        val deltaAngleRadians = localDragX / leverArm
+                        val deltaAngleDegrees = Math.toDegrees(deltaAngleRadians.toDouble())
+
+                        onRotateBy(deltaAngleDegrees.toFloat())
+                    }
+                }
+            )
+            ResizeHandle(
+                modifier = Modifier.align(Alignment.BottomEnd),
+                onDrag = { dragAmount ->
+                    onResize(dragAmount)
+                }
+            )
+        }
     }
+}
+
+@Composable
+fun BoxScope.BaseHandle(
+    modifier: Modifier = Modifier,
+    shape: Shape,
+    onDrag: (Offset) -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .size(24.dp)
+            .background(Color(0xFF90CBFB), shape)
+            .border(2.dp, Color.White, shape)
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    onDrag(dragAmount)
+                }
+            }
+    )
+}
+
+@Composable
+fun BoxScope.RotationHandle(
+    modifier: Modifier = Modifier,
+    onDrag: (Offset) -> Unit,
+) {
+    BaseHandle(modifier = modifier, shape = CircleShape, onDrag = onDrag)
+}
+
+@Composable
+fun BoxScope.ResizeHandle(
+    modifier: Modifier = Modifier,
+    onDrag: (Offset) -> Unit,
+) {
+    BaseHandle(modifier = modifier, shape = RoundedCornerShape(4.dp), onDrag = onDrag)
 }

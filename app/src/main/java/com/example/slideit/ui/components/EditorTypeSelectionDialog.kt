@@ -74,11 +74,11 @@ fun EditorTypeSelectionDialog(
                     onClick = onSimpleEditorSelected
                 )
 
-                // 상세 편집 옵션
+                // 캔버스 편집 옵션 (개선됨!)
                 EditorOption(
                     icon = Icons.Default.Create,
-                    title = "상세 편집",
-                    description = "이미지, 도형, 텍스트를 자유롭게 배치",
+                    title = "상세 편집 (권장)",
+                    description = "이미지, 도형, 텍스트 - 드래그, 회전, 크기 조정",
                     gradientColors = listOf(
                         Color(0xFF8B7FD6),
                         Color(0xFF6B5FB0)

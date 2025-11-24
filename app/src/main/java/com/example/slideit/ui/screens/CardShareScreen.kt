@@ -30,11 +30,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.slideit.data.model.BusinessCard
 import com.example.slideit.ui.components.CardRenderer
 import com.example.slideit.util.BitmapConverter
 import com.example.slideit.viewmodel.CardViewModel
 import kotlinx.coroutines.launch
+import java.io.File
+import androidx.compose.ui.layout.ContentScale
 
 /**
  * 명함 공유 화면 - 3D 홀로그래픽 효과
@@ -48,17 +51,17 @@ fun CardShareScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val myCard by viewModel.firstMyCard.collectAsStateWithLifecycle(initialValue = null)
-    var targetRotationX by remember { mutableFloatStateOf(0f) }
-    var targetRotationY by remember { mutableFloatStateOf(0f) }
-    var targetGlareX by remember { mutableFloatStateOf(50f) }
-    var targetGlareY by remember { mutableFloatStateOf(50f) }
-    var glareOpacity by remember { mutableFloatStateOf(0f) }
-    var targetTranslationX by remember { mutableFloatStateOf(0f) }
-    var targetTranslationY by remember { mutableFloatStateOf(0f) }
+    val targetRotationXState = remember { mutableFloatStateOf(0f) }
+    val targetRotationYState = remember { mutableFloatStateOf(0f) }
+    val targetGlareXState = remember { mutableFloatStateOf(50f) }
+    val targetGlareYState = remember { mutableFloatStateOf(50f) }
+    val glareOpacityState = remember { mutableFloatStateOf(0f) }
+    val targetTranslationXState = remember { mutableFloatStateOf(0f) }
+    val targetTranslationYState = remember { mutableFloatStateOf(0f) }
 
     // 스프링 애니메이션으로 부드럽게 전환
     val rotationX by animateFloatAsState(
-        targetValue = targetRotationX,
+        targetValue = targetRotationXState.value,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -67,7 +70,7 @@ fun CardShareScreen(
     )
 
     val rotationY by animateFloatAsState(
-        targetValue = targetRotationY,
+        targetValue = targetRotationYState.value,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -76,7 +79,7 @@ fun CardShareScreen(
     )
 
     val glareX by animateFloatAsState(
-        targetValue = targetGlareX,
+        targetValue = targetGlareXState.value,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -85,7 +88,7 @@ fun CardShareScreen(
     )
 
     val glareY by animateFloatAsState(
-        targetValue = targetGlareY,
+        targetValue = targetGlareYState.value,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -94,7 +97,7 @@ fun CardShareScreen(
     )
 
     val opacity by animateFloatAsState(
-        targetValue = glareOpacity,
+        targetValue = glareOpacityState.value,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium
@@ -103,13 +106,13 @@ fun CardShareScreen(
     )
 
     val translationX by animateFloatAsState(
-        targetValue = targetTranslationX,
+        targetValue = targetTranslationXState.value,
         animationSpec = spring(stiffness = Spring.StiffnessLow),
         label = "translationX"
     )
 
     val translationY by animateFloatAsState(
-        targetValue = targetTranslationY,
+        targetValue = targetTranslationYState.value,
         animationSpec = spring(stiffness = Spring.StiffnessLow),
         label = "translationY"
     )
@@ -178,67 +181,66 @@ fun CardShareScreen(
                     )
                 }
             }
-        } else {
-            // 내 명함 표시
-            val card = myCard ?: return
-
-            Box(modifier = Modifier.padding(32.dp)) {
-                CardRenderer(
-                    card = card,
-                    modifier = Modifier
-                        .shadow(
-                            elevation = 24.dp,
-                            shape = RoundedCornerShape(16.dp),
-                            ambientColor = Color(0x40000000),
-                            spotColor = Color(0x40000000),
-                            clip = false
+                } else {
+                    // 내 명함 표시
+                    val card = myCard ?: return
+        
+                    Box(modifier = Modifier.padding(32.dp)) {
+                        CardRenderer(
+                            card = card,
+                            modifier = Modifier
+                                .shadow(
+                                    elevation = 24.dp,
+                                    shape = RoundedCornerShape(16.dp),
+                                    ambientColor = Color(0x40000000),
+                                    spotColor = Color(0x40000000),
+                                    clip = false
+                                )
+                                .pointerInput(Unit) {
+                                    detectDragGestures(
+                                        onDragStart = {
+                                            glareOpacityState.value = 1f
+                                        },
+                                        onDragEnd = {
+                                            targetRotationXState.value = 0f
+                                            targetRotationYState.value = 0f
+                                            targetTranslationXState.value = 0f
+                                            targetTranslationYState.value = 0f
+                                            glareOpacityState.value = 0f
+                                        },
+                                        onDragCancel = {
+                                            targetRotationXState.value = 0f
+                                            targetRotationYState.value = 0f
+                                            targetTranslationXState.value = 0f
+                                            targetTranslationYState.value = 0f
+                                            glareOpacityState.value = 0f
+                                        }
+                                    ) { change, _ ->
+                                        change.consume()
+        
+                                        val centerX = size.width / 2f
+                                        val centerY = size.height / 2f
+                                        val x = change.position.x
+                                        val y = change.position.y
+        
+                                        targetRotationXState.value = ((y - centerY) / centerY) * -25f
+                                        targetRotationYState.value = ((x - centerX) / centerX) * 25f
+                                        targetGlareXState.value = (x / size.width) * 100f
+                                        targetGlareYState.value = (y / size.height) * 100f
+                                        targetTranslationXState.value = ((x - centerX) / centerX) * 10f
+                                        targetTranslationYState.value = ((y - centerY) / centerY) * 10f
+                                    }
+                                },
+                            cardWidth = 340.dp,
+                            rotationX = rotationX,
+                            rotationY = rotationY,
+                            translationX = translationX,
+                            translationY = translationY,
+                            glareX = glareX,
+                            glareY = glareY,
+                            glareOpacity = opacity,
+                            showRotated = true
                         )
-                        .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = {
-                                    glareOpacity = 1f
-                                },
-                                onDragEnd = {
-                                    targetRotationX = 0f
-                                    targetRotationY = 0f
-                                    targetTranslationX = 0f
-                                    targetTranslationY = 0f
-                                    glareOpacity = 0f
-                                },
-                                onDragCancel = {
-                                    targetRotationX = 0f
-                                    targetRotationY = 0f
-                                    targetTranslationX = 0f
-                                    targetTranslationY = 0f
-                                    glareOpacity = 0f
-                                }
-                            ) { change, _ ->
-                                change.consume()
-
-                                val centerX = size.width / 2f
-                                val centerY = size.height / 2f
-                                val x = change.position.x
-                                val y = change.position.y
-
-                                targetRotationX = ((y - centerY) / centerY) * -25f
-                                targetRotationY = ((x - centerX) / centerX) * 25f
-                                targetGlareX = (x / size.width) * 100f
-                                targetGlareY = (y / size.height) * 100f
-                                targetTranslationX = ((x - centerX) / centerX) * 10f
-                                targetTranslationY = ((y - centerY) / centerY) * 10f
-                            }
-                        },
-                    cardWidth = 340.dp,
-                    rotationX = rotationX,
-                    rotationY = rotationY,
-                    translationX = translationX,
-                    translationY = translationY,
-                    glareX = glareX,
-                    glareY = glareY,
-                    glareOpacity = opacity,
-                    showRotated = true
-                )
-            }
-        }
-    }
+                    }
+                }    }
 }

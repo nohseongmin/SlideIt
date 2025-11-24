@@ -16,3 +16,4 @@ local.properties
 
 # Claude Code MCP configuration (contains API tokens)
 .claude/mcp.json
+.mcp.json

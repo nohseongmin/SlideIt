@@ -122,10 +122,25 @@ class CanvasEditorViewModel(application: Application) : AndroidViewModel(applica
     /**
      * 요소 크기 조정
      */
-    fun resizeElement(id: String, newSize: Offset) {
+    fun resizeElement(id: String, dragAmount: Offset) {
         val index = _elements.indexOfFirst { it.id == id }
         if (index != -1) {
-            _elements[index] = _elements[index].copy(size = newSize)
+            val element = _elements[index]
+            val currentSize = element.size
+            val newSize = Offset(
+                (currentSize.x + dragAmount.x).coerceAtLeast(20f),
+                (currentSize.y + dragAmount.y).coerceAtLeast(20f)
+            )
+
+            var updatedElement = element.copy(size = newSize)
+
+            if (element.type == ElementType.TEXT && element.fontSize != null && currentSize.x > 0) {
+                val widthRatio = newSize.x / currentSize.x
+                val newFontSize = element.fontSize * widthRatio
+                updatedElement = updatedElement.copy(fontSize = newFontSize.coerceAtLeast(8f))
+            }
+
+            _elements[index] = updatedElement
         }
     }
 
@@ -136,6 +151,13 @@ class CanvasEditorViewModel(application: Application) : AndroidViewModel(applica
         val index = _elements.indexOfFirst { it.id == id }
         if (index != -1) {
             _elements[index] = _elements[index].copy(rotation = rotation)
+        }
+    }
+    
+    fun rotateElementBy(id: String, delta: Float) {
+        val index = _elements.indexOfFirst { it.id == id }
+        if (index != -1) {
+            _elements[index] = _elements[index].copy(rotation = _elements[index].rotation + delta)
         }
     }
 
@@ -212,92 +234,47 @@ class CanvasEditorViewModel(application: Application) : AndroidViewModel(applica
     }
 
     /**
-     * 캔버스 데이터를 CardElement 리스트로 변환
+     * 캔버스 데이터를 CardElement 리스트로 변환 (편집기 -> 저장)
      */
     fun toCardElements(): List<CardElement> {
+        // Editor is portrait (680w x 1080h)
+        // Saved data is portrait (680w x 1080h)
+        // No coordinate transformation needed, just relative conversion.
+        val cardWidth = 680f
+        val cardHeight = 1080f
+
         return elements.map { canvasElement ->
+            val relativeX = canvasElement.position.x / cardWidth
+            val relativeY = canvasElement.position.y / cardHeight
+            val relativeWidth = canvasElement.size.x / cardWidth
+            val relativeHeight = canvasElement.size.y / cardHeight
+
             when (canvasElement.type) {
-                ElementType.TEXT -> CardElement.TextElement(
-                    id = canvasElement.id,
-                    x = canvasElement.position.x,
-                    y = canvasElement.position.y,
-                    width = canvasElement.size.x,
-                    height = canvasElement.size.y,
-                    rotation = canvasElement.rotation,
-                    text = canvasElement.text ?: "",
-                    fontSize = canvasElement.fontSize ?: 16f,
-                    color = canvasElement.color ?: 0xFF000000
-                )
-                ElementType.IMAGE -> CardElement.ImageElement(
-                    id = canvasElement.id,
-                    x = canvasElement.position.x,
-                    y = canvasElement.position.y,
-                    width = canvasElement.size.x,
-                    height = canvasElement.size.y,
-                    rotation = canvasElement.rotation,
-                    imageUri = canvasElement.imageUri ?: ""
-                )
-                ElementType.SHAPE -> CardElement.ShapeElement(
-                    id = canvasElement.id,
-                    x = canvasElement.position.x,
-                    y = canvasElement.position.y,
-                    width = canvasElement.size.x,
-                    height = canvasElement.size.y,
-                    rotation = canvasElement.rotation,
-                    zIndex = 0,
-                    shapeType = canvasElement.shapeType ?: com.example.slideit.data.model.ShapeType.RECTANGLE,
-                    fillColor = canvasElement.color ?: 0xFF90CBFB
-                )
+                ElementType.TEXT -> CardElement.TextElement(id = canvasElement.id, x = relativeX, y = relativeY, width = relativeWidth, height = relativeHeight, rotation = canvasElement.rotation, text = canvasElement.text ?: "", fontSize = canvasElement.fontSize ?: 16f, color = canvasElement.color ?: 0xFF000000)
+                ElementType.IMAGE -> CardElement.ImageElement(id = canvasElement.id, x = relativeX, y = relativeY, width = relativeWidth, height = relativeHeight, rotation = canvasElement.rotation, imageUri = canvasElement.imageUri ?: "")
+                ElementType.SHAPE -> CardElement.ShapeElement(id = canvasElement.id, x = relativeX, y = relativeY, width = relativeWidth, height = relativeHeight, rotation = canvasElement.rotation, zIndex = 0, shapeType = canvasElement.shapeType ?: com.example.slideit.data.model.ShapeType.RECTANGLE, fillColor = canvasElement.color ?: 0xFF90CBFB)
             }
         }
     }
 
     /**
-     * CardElement 리스트에서 캔버스 데이터 복원
+     * CardElement 리스트에서 캔버스 데이터 복원 (저장 -> 편집기)
      */
     fun fromCardElements(cardElements: List<CardElement>) {
         _elements.clear()
+        val cardWidth = 680f
+        val cardHeight = 1080f
+
         cardElements.forEach { cardElement ->
+            val absoluteX = cardElement.x * cardWidth
+            val absoluteY = cardElement.y * cardHeight
+            val absoluteWidth = cardElement.width * cardWidth
+            val absoluteHeight = cardElement.height * cardHeight
+
             when (cardElement) {
-                is CardElement.TextElement -> {
-                    _elements.add(
-                        CanvasElement(
-                            id = cardElement.id,
-                            type = ElementType.TEXT,
-                            position = Offset(cardElement.x, cardElement.y),
-                            size = Offset(cardElement.width, cardElement.height),
-                            rotation = cardElement.rotation,
-                            text = cardElement.text,
-                            fontSize = cardElement.fontSize,
-                            color = cardElement.color
-                        )
-                    )
-                }
-                is CardElement.ImageElement -> {
-                    _elements.add(
-                        CanvasElement(
-                            id = cardElement.id,
-                            type = ElementType.IMAGE,
-                            position = Offset(cardElement.x, cardElement.y),
-                            size = Offset(cardElement.width, cardElement.height),
-                            rotation = cardElement.rotation,
-                            imageUri = cardElement.imageUri
-                        )
-                    )
-                }
-                is CardElement.ShapeElement -> {
-                    _elements.add(
-                        CanvasElement(
-                            id = cardElement.id,
-                            type = ElementType.SHAPE,
-                            position = Offset(cardElement.x, cardElement.y),
-                            size = Offset(cardElement.width, cardElement.height),
-                            rotation = cardElement.rotation,
-                            shapeType = cardElement.shapeType,
-                            color = cardElement.fillColor
-                        )
-                    )
-                }
+                is CardElement.TextElement -> _elements.add(CanvasElement(id = cardElement.id, type = ElementType.TEXT, position = Offset(absoluteX, absoluteY), size = Offset(absoluteWidth, absoluteHeight), rotation = cardElement.rotation, text = cardElement.text, fontSize = cardElement.fontSize, color = cardElement.color))
+                is CardElement.ImageElement -> _elements.add(CanvasElement(id = cardElement.id, type = ElementType.IMAGE, position = Offset(absoluteX, absoluteY), size = Offset(absoluteWidth, absoluteHeight), rotation = cardElement.rotation, imageUri = cardElement.imageUri))
+                is CardElement.ShapeElement -> _elements.add(CanvasElement(id = cardElement.id, type = ElementType.SHAPE, position = Offset(absoluteX, absoluteY), size = Offset(absoluteWidth, absoluteHeight), rotation = cardElement.rotation, shapeType = cardElement.shapeType, color = cardElement.fillColor))
             }
         }
     }
