@@ -1,0 +1,447 @@
+package com.example.slideit
+
+import android.net.Uri
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.PreviewScreenSizes
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.example.slideit.data.model.BusinessCard
+import com.example.slideit.ui.components.EditorTypeSelectionDialog
+import com.example.slideit.ui.screens.CameraScreen
+import com.example.slideit.ui.screens.CardCanvasEditorScreen
+import com.example.slideit.ui.screens.CardEditorScreen
+import com.example.slideit.ui.screens.CardShareScreen
+import com.example.slideit.ui.screens.CardStorageScreen
+import com.example.slideit.ui.screens.ProfileScreen
+import com.example.slideit.ui.screens.SettingsScreen
+import com.example.slideit.ui.theme.SlideITTheme
+import com.example.slideit.util.ParsedCardInfo
+import com.example.slideit.util.PreferencesManager
+import com.example.slideit.util.TextRecognitionUtil
+import com.example.slideit.viewmodel.CardViewModel
+import kotlinx.coroutines.launch
+
+class MainActivity : ComponentActivity() {
+    private val preferencesManager by lazy { PreferencesManager(this) }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            val isDarkMode by preferencesManager.isDarkModeEnabled.collectAsStateWithLifecycle(initialValue = false)
+
+            SlideITTheme(darkTheme = isDarkMode) {
+                SlideITApp()
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@PreviewScreenSizes
+@Composable
+fun SlideITApp() {
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // 페이저 상태 (0: Storage, 1: Share, 2: Profile)
+    val pagerState = rememberPagerState(initialPage = 1) { 3 } // Share 화면부터 시작
+
+    // 내 명함 저장 후 Share 화면으로 이동
+    var navigateToShareAfterSave by remember { mutableStateOf(false) }
+
+    // 에디터 선택 다이얼로그 상태
+    var showEditorDialog by remember { mutableStateOf(false) }
+    var isMyCardEditor by remember { mutableStateOf(false) }
+
+    LaunchedEffect(navigateToShareAfterSave) {
+        if (navigateToShareAfterSave) {
+            pagerState.animateScrollToPage(1)
+            navigateToShareAfterSave = false
+        }
+    }
+
+    // OCR 결과 상태
+    var parsedCardInfo by remember { mutableStateOf<ParsedCardInfo?>(null) }
+
+    // 이미지 피커
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            coroutineScope.launch {
+                try {
+                    // OCR 처리
+                    val extractedText = TextRecognitionUtil.extractTextFromImage(context, it)
+                    parsedCardInfo = TextRecognitionUtil.parseBusinessCardText(extractedText)
+
+                    // 에디터로 이동
+                    navController.navigate(Screen.CardEditor.route)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    // 에러 발생 시에도 빈 상태로 에디터 열기
+                    parsedCardInfo = null
+                    navController.navigate(Screen.CardEditor.route)
+                }
+            }
+        }
+    }
+
+    val onPickImage = {
+        imagePickerLauncher.launch("image/*")
+    }
+
+    // 하단 네비게이션이 표시되어야 하는 화면인지 확인
+    // 특수 화면(에디터, 카메라, 설정)이 아닐 때만 하단 네비게이션 표시
+    // null(초기 상태)일 때도 하단 네비게이션 표시
+    val showBottomNav = currentDestination?.route == null || currentDestination.route !in listOf(
+        Screen.CardEditor.route,
+        Screen.MyCardEditor.route,
+        "canvas_editor",
+        Screen.Settings.route,
+        Screen.Camera.route
+    )
+
+    val viewModel: CardViewModel = viewModel()
+    var cardToEdit by remember { mutableStateOf<BusinessCard?>(null) }
+
+    // NavHost는 항상 렌더링 (navController 상태 유지)
+    Box(modifier = Modifier.fillMaxSize()) {
+        SlideITNavHost(
+            navController = navController,
+            modifier = Modifier.fillMaxSize(),
+            onPickImage = onPickImage,
+            parsedCardInfo = parsedCardInfo,
+            onCardInfoUsed = { parsedCardInfo = null },
+            onParsedCardInfoChanged = { parsedCardInfo = it },
+            cardToEdit = cardToEdit,
+            pagerState = pagerState,
+            onNavigateToShareAfterSave = { navigateToShareAfterSave = true },
+            isVisible = !showBottomNav
+        )
+
+        if (showBottomNav) {
+            NavigationSuiteScaffold(
+                navigationSuiteItems = {
+                    AppDestinations.entries.forEachIndexed { index, destination ->
+                        val isSelected = pagerState.currentPage == index
+
+                        item(
+                            icon = {
+                                Icon(
+                                    destination.icon,
+                                    contentDescription = destination.label,
+                                    tint = if (isSelected) {
+                                        Color(0xFF90CBFB)
+                                    } else {
+                                        Color.Gray
+                                    }
+                                )
+                            },
+                            label = {
+                                Text(
+                                    destination.label,
+                                    color = if (isSelected) {
+                                        Color(0xFF90CBFB)
+                                    } else {
+                                        Color.Gray
+                                    }
+                                )
+                            },
+                            selected = isSelected,
+                            onClick = {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(index)
+                                }
+                            }
+                        )
+                    }
+                }
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    userScrollEnabled = true,
+                    beyondViewportPageCount = 0
+                ) { page ->
+                    when (page) {
+                        0 -> CardStorageScreen(
+                            modifier = Modifier.fillMaxSize(),
+                            viewModel = viewModel,
+                            onNavigateToEditor = {
+                                cardToEdit = null
+                                isMyCardEditor = false
+                                showEditorDialog = true
+                            },
+                            onNavigateToEditCard = { card ->
+                                cardToEdit = card
+                                navController.navigate(Screen.CardEditor.route)
+                            },
+                            onPickImage = onPickImage,
+                            onNavigateToCamera = {
+                                navController.navigate(Screen.Camera.route)
+                            }
+                        )
+                        1 -> CardShareScreen(
+                            modifier = Modifier.fillMaxSize(),
+                            viewModel = viewModel,
+                            onNavigateToEditor = {
+                                cardToEdit = null
+                                isMyCardEditor = true
+                                showEditorDialog = true
+                            }
+                        )
+                        2 -> ProfileScreen(
+                            modifier = Modifier.fillMaxSize(),
+                            viewModel = viewModel,
+                            onNavigateToEditor = { isMyCard, card ->
+                                cardToEdit = card
+                                isMyCardEditor = isMyCard
+                                showEditorDialog = true
+                            },
+                            onNavigateToSettings = {
+                                navController.navigate(Screen.Settings.route)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 에디터 선택 다이얼로그 (화면 위에 표시)
+        if (showEditorDialog) {
+            EditorTypeSelectionDialog(
+                onDismiss = {
+                    showEditorDialog = false
+                },
+                onSimpleEditorSelected = {
+                    showEditorDialog = false
+                    navController.navigate(
+                        if (isMyCardEditor) Screen.MyCardEditor.route else Screen.CardEditor.route
+                    )
+                },
+                onCanvasEditorSelected = {
+                    showEditorDialog = false
+                    navController.navigate("canvas_editor")
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun SlideITNavHost(
+    navController: NavHostController,
+    modifier: Modifier = Modifier,
+    onPickImage: () -> Unit = {},
+    parsedCardInfo: ParsedCardInfo? = null,
+    onCardInfoUsed: () -> Unit = {},
+    onParsedCardInfoChanged: (ParsedCardInfo?) -> Unit = {},
+    cardToEdit: BusinessCard? = null,
+    pagerState: androidx.compose.foundation.pager.PagerState? = null,
+    onNavigateToShareAfterSave: () -> Unit = {},
+    isVisible: Boolean = true
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val viewModel: CardViewModel = viewModel()
+    var internalCardToEdit by remember { mutableStateOf(cardToEdit) }
+
+    // cardToEdit가 변경되면 내부 상태도 업데이트
+    LaunchedEffect(cardToEdit) {
+        internalCardToEdit = cardToEdit
+    }
+
+    Box(
+        modifier = modifier.graphicsLayer {
+            alpha = if (isVisible) 1f else 0f
+        }
+    ) {
+        NavHost(
+            navController = navController,
+            startDestination = Screen.CardEditor.route
+        ) {
+            composable(Screen.CardEditor.route) {
+            // OCR 데이터나 편집할 카드가 있는 경우에만 사용되는 route
+            CardEditorScreen(
+                modifier = Modifier.fillMaxSize(),
+                cardToEdit = internalCardToEdit,
+                parsedCardInfo = parsedCardInfo,
+                isMyCard = false,
+                viewModel = viewModel,
+                onNavigateBack = {
+                    internalCardToEdit = null
+                    onCardInfoUsed()
+                    navController.navigateUp()
+                }
+            )
+        }
+
+        // CANVAS 에디터 화면
+        composable("canvas_editor") {
+            CardCanvasEditorScreen(
+                modifier = Modifier.fillMaxSize(),
+                cardToEdit = internalCardToEdit,
+                isMyCard = true,
+                cardViewModel = viewModel,
+                onNavigateBack = {
+                    internalCardToEdit = null
+                    navController.navigateUp()
+                },
+                onSaveMyCard = {
+                    internalCardToEdit = null
+                    navController.popBackStack()
+                    onNavigateToShareAfterSave()
+                }
+            )
+        }
+
+        composable(Screen.MyCardEditor.route) {
+            CardEditorScreen(
+                modifier = Modifier.fillMaxSize(),
+                cardToEdit = internalCardToEdit,
+                isMyCard = true,
+                viewModel = viewModel,
+                onNavigateBack = {
+                    internalCardToEdit = null
+                    navController.navigateUp()
+                },
+                onSaveMyCard = {
+                    internalCardToEdit = null
+                    navController.popBackStack()
+                    // 명함 공유 화면으로 이동
+                    onNavigateToShareAfterSave()
+                }
+            )
+        }
+
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                modifier = Modifier.fillMaxSize(),
+                onNavigateBack = {
+                    navController.navigateUp()
+                }
+            )
+        }
+
+        composable(Screen.Camera.route) {
+            val cameraContext = LocalContext.current
+            val cameraScope = rememberCoroutineScope()
+            var cameraParsedInfo by remember { mutableStateOf<ParsedCardInfo?>(null) }
+
+            CameraScreen(
+                modifier = Modifier.fillMaxSize(),
+                onImageCaptured = { uri ->
+                    cameraScope.launch {
+                        try {
+                            val extractedText = TextRecognitionUtil.extractTextFromImage(cameraContext, uri)
+                            cameraParsedInfo = TextRecognitionUtil.parseBusinessCardText(extractedText)
+                            navController.navigate(Screen.CardEditor.route) {
+                                popUpTo(Screen.Storage.route)
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            cameraParsedInfo = null
+                            navController.navigate(Screen.CardEditor.route) {
+                                popUpTo(Screen.Storage.route)
+                            }
+                        }
+                    }
+                },
+                onNavigateBack = {
+                    navController.navigateUp()
+                }
+            )
+
+            LaunchedEffect(cameraParsedInfo) {
+                cameraParsedInfo?.let {
+                    onParsedCardInfoChanged(it)
+                    cameraParsedInfo = null
+                }
+            }
+        }
+    }
+}
+
+sealed class Screen(val route: String) {
+    object Storage : Screen("storage")
+    object Share : Screen("share")
+    object Profile : Screen("profile")
+    object CardEditor : Screen("card_editor")
+    object MyCardEditor : Screen("my_card_editor")
+    object Settings : Screen("settings")
+    object Camera : Screen("camera")
+}
+
+enum class AppDestinations(
+    val label: String,
+    val icon: ImageVector,
+    val screen: Screen
+) {
+    STORAGE("명함 보관함", Icons.Default.Home, Screen.Storage),
+    SHARE("명함 공유", Icons.Default.Share, Screen.Share),
+    PROFILE("개인 설정", Icons.Default.Person, Screen.Profile),
+}

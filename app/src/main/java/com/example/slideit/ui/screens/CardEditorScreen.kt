@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -21,8 +22,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.slideit.data.model.BusinessCard
+import com.example.slideit.data.model.CardTemplates
 import com.example.slideit.util.ParsedCardInfo
 import com.example.slideit.viewmodel.CardViewModel
+import kotlinx.coroutines.launch
 
 /**
  * 명함 에디터 화면
@@ -35,22 +38,26 @@ fun CardEditorScreen(
     parsedCardInfo: ParsedCardInfo? = null,
     isMyCard: Boolean = false,
     viewModel: CardViewModel = viewModel(),
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onSaveMyCard: () -> Unit = {}
 ) {
     // OCR 결과가 있으면 우선 사용, 없으면 cardToEdit 사용
-    var name by remember { mutableStateOf(parsedCardInfo?.name ?: cardToEdit?.name ?: "") }
-    var position by remember { mutableStateOf(parsedCardInfo?.position ?: cardToEdit?.position ?: "") }
-    var department by remember { mutableStateOf(parsedCardInfo?.department ?: cardToEdit?.department ?: "") }
-    var company by remember { mutableStateOf(parsedCardInfo?.company ?: cardToEdit?.company ?: "") }
-    var email by remember { mutableStateOf(parsedCardInfo?.email ?: cardToEdit?.email ?: "") }
-    var phone by remember { mutableStateOf(parsedCardInfo?.phone ?: cardToEdit?.phone ?: "") }
-    var address by remember { mutableStateOf(parsedCardInfo?.address ?: cardToEdit?.address ?: "") }
+    var name by remember(cardToEdit, parsedCardInfo) { mutableStateOf(parsedCardInfo?.name ?: cardToEdit?.name ?: "") }
+    var position by remember(cardToEdit, parsedCardInfo) { mutableStateOf(parsedCardInfo?.position ?: cardToEdit?.position ?: "") }
+    var department by remember(cardToEdit, parsedCardInfo) { mutableStateOf(parsedCardInfo?.department ?: cardToEdit?.department ?: "") }
+    var company by remember(cardToEdit, parsedCardInfo) { mutableStateOf(parsedCardInfo?.company ?: cardToEdit?.company ?: "") }
+    var email by remember(cardToEdit, parsedCardInfo) { mutableStateOf(parsedCardInfo?.email ?: cardToEdit?.email ?: "") }
+    var phone by remember(cardToEdit, parsedCardInfo) { mutableStateOf(parsedCardInfo?.phone ?: cardToEdit?.phone ?: "") }
+    var address by remember(cardToEdit, parsedCardInfo) { mutableStateOf(parsedCardInfo?.address ?: cardToEdit?.address ?: "") }
 
-    var selectedBackgroundColor by remember { mutableStateOf(cardToEdit?.backgroundColor ?: 0xFFFFFFFF) }
-    var selectedTextColor by remember { mutableStateOf(cardToEdit?.textColor ?: 0xFF1F1F1F) }
-    var selectedAccentColor by remember { mutableStateOf(cardToEdit?.accentColor ?: 0xFF90CBFB) }
+    var selectedBackgroundColor by remember(cardToEdit) { mutableLongStateOf(cardToEdit?.backgroundColor ?: 0xFFFFFFFF) }
+    var selectedTextColor by remember(cardToEdit) { mutableLongStateOf(cardToEdit?.textColor ?: 0xFF1F1F1F) }
+    var selectedAccentColor by remember(cardToEdit) { mutableLongStateOf(cardToEdit?.accentColor ?: 0xFF90CBFB) }
+    var selectedTemplateId by remember(cardToEdit) { mutableStateOf(cardToEdit?.templateId ?: "default") }
+    var showTemplateSelector by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -215,9 +222,35 @@ fun CardEditorScreen(
                 }
             }
 
+            // 템플릿 선택 섹션
+            Text(
+                text = "명함 템플릿",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF1F1F1F)
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Button(
+                    onClick = { showTemplateSelector = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF90CBFB)
+                    )
+                ) {
+                    Text("템플릿 선택하기")
+                }
+            }
+
             // 디자인 설정 섹션
             Text(
-                text = "디자인 설정",
+                text = "디자인 설정 (고급)",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = Color(0xFF1F1F1F)
@@ -310,31 +343,55 @@ fun CardEditorScreen(
             // 저장 버튼
             Button(
                 onClick = {
-                    if (name.isNotEmpty() && position.isNotEmpty() &&
-                        company.isNotEmpty() && email.isNotEmpty() && phone.isNotEmpty()) {
-                        val newCard = BusinessCard(
-                            id = cardToEdit?.id ?: java.util.UUID.randomUUID().toString(),
-                            name = name,
-                            position = position,
-                            department = department,
-                            company = company,
-                            email = email,
-                            phone = phone,
-                            address = address,
-                            backgroundColor = selectedBackgroundColor,
-                            textColor = selectedTextColor,
-                            accentColor = selectedAccentColor,
-                            isMyCard = cardToEdit?.isMyCard ?: isMyCard,
-                            createdAt = cardToEdit?.createdAt ?: System.currentTimeMillis()
-                        )
+                    coroutineScope.launch {
+                        // 이름 + (회사/전화/이메일 중 하나) 있으면 저장
+                        if (name.isNotEmpty() &&
+                            (company.isNotEmpty() || phone.isNotEmpty() || email.isNotEmpty())
+                        ) {
+                            val cardToSave = cardToEdit?.copy(
+                                name = name,
+                                position = position,
+                                department = department,
+                                company = company,
+                                email = email,
+                                phone = phone,
+                                address = address,
+                                backgroundColor = selectedBackgroundColor,
+                                textColor = selectedTextColor,
+                                accentColor = selectedAccentColor,
+                                templateId = selectedTemplateId,
+                                isMyCard = isMyCard,
+                                lastModifiedAt = System.currentTimeMillis()
+                            ) ?: BusinessCard(
+                                name = name,
+                                position = position,
+                                department = department,
+                                company = company,
+                                email = email,
+                                phone = phone,
+                                address = address,
+                                backgroundColor = selectedBackgroundColor,
+                                textColor = selectedTextColor,
+                                accentColor = selectedAccentColor,
+                                templateId = selectedTemplateId,
+                                isMyCard = isMyCard,
+                                createdAt = System.currentTimeMillis(),
+                                lastModifiedAt = System.currentTimeMillis()
+                            )
 
-                        if (cardToEdit != null) {
-                            viewModel.updateCard(newCard)
-                        } else {
-                            viewModel.insertCard(newCard)
+                            if (cardToEdit != null) {
+                                viewModel.updateCard(cardToSave)
+                            } else {
+                                viewModel.insertCard(cardToSave)
+                            }
+
+                            // 내 명함이면 공유 화면으로, 아니면 뒤로가기
+                            if (isMyCard) {
+                                onSaveMyCard()
+                            } else {
+                                onNavigateBack()
+                            }
                         }
-
-                        onNavigateBack()
                     }
                 },
                 modifier = Modifier
@@ -344,8 +401,8 @@ fun CardEditorScreen(
                     containerColor = Color(0xFF90CBFB)
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = name.isNotEmpty() && position.isNotEmpty() &&
-                         company.isNotEmpty() && email.isNotEmpty() && phone.isNotEmpty()
+                enabled = name.isNotEmpty() &&
+                        (company.isNotEmpty() || phone.isNotEmpty() || email.isNotEmpty())
             ) {
                 Text(
                     text = "저장",
@@ -355,6 +412,60 @@ fun CardEditorScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+        }
+
+        // 템플릿 선택 다이얼로그
+        if (showTemplateSelector) {
+            AlertDialog(
+                onDismissRequest = { showTemplateSelector = false },
+                title = { Text("명함 템플릿 선택") },
+                text = {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CardTemplates.templates.forEach { template ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedTemplateId = template.id
+                                        selectedBackgroundColor = template.backgroundColor
+                                        selectedTextColor = template.textColor
+                                        selectedAccentColor = template.accentColor
+                                        showTemplateSelector = false
+                                    },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(template.backgroundColor)
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp)
+                                ) {
+                                    Text(
+                                        text = template.name,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(template.textColor)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = template.description,
+                                        fontSize = 12.sp,
+                                        color = Color(template.textColor).copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showTemplateSelector = false }) {
+                        Text("닫기")
+                    }
+                }
+            )
         }
     }
 }

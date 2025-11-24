@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("com.google.devtools.ksp") version "2.0.21-1.0.28"
+    alias(libs.plugins.google.devtools.ksp)
 }
 
 android {
@@ -13,8 +13,8 @@ android {
         applicationId = "com.example.slideit"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 4
+        versionName = "0.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -51,22 +51,44 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.compose.material.icons.extended)
 
     // Room
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     // ViewModel
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
     // ML Kit Text Recognition
-    implementation("com.google.mlkit:text-recognition:16.0.0")
-    implementation("com.google.mlkit:text-recognition-korean:16.0.0")
+    implementation(libs.google.mlkit.text.recognition)
+    implementation(libs.google.mlkit.text.recognition.korean)
 
     // Kotlin Coroutines for Firebase/Google Play Services
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    implementation(libs.kotlinx.coroutines.play.services)
+
+    // QR Code
+    implementation(libs.google.zxing.core)
+    implementation(libs.journeyapps.zxing.android.embedded)
+
+    // Image Loading
+    implementation(libs.coil.compose)
+
+    // CSV
+    implementation(libs.opencsv)
+
+    // Gson for JSON serialization
+    implementation(libs.google.gson)
+
+    // Camera
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    // DataStore for preferences
+    implementation(libs.androidx.datastore.preferences)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

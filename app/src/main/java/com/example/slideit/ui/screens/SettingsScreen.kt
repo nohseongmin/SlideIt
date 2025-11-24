@@ -1,5 +1,8 @@
 package com.example.slideit.ui.screens
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,7 +10,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,9 +25,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.slideit.util.CsvUtil
+import com.example.slideit.util.PreferencesManager
+import com.example.slideit.viewmodel.CardViewModel
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 /**
  * 개인 설정 화면
@@ -26,10 +45,56 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
+    viewModel: CardViewModel = viewModel(),
     onNavigateBack: () -> Unit = {}
 ) {
-    var isDarkModeEnabled by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val preferencesManager = remember { PreferencesManager(context) }
+
+    val isDarkModeEnabled by preferencesManager.isDarkModeEnabled.collectAsStateWithLifecycle(initialValue = false)
     var isNotificationsEnabled by remember { mutableStateOf(true) }
+    var showExportSuccess by remember { mutableStateOf(false) }
+    var showImportSuccess by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    val allCards by viewModel.allCards.collectAsStateWithLifecycle(initialValue = emptyList())
+    val receivedCards by viewModel.receivedCards.collectAsStateWithLifecycle(initialValue = emptyList())
+
+    // CSV 내보내기 런처
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let {
+            coroutineScope.launch {
+                val result = CsvUtil.exportToCSV(context, allCards, it)
+                if (result.isSuccess) {
+                    showExportSuccess = true
+                } else {
+                    errorMessage = "내보내기 실패: ${result.exceptionOrNull()?.message}"
+                }
+            }
+        }
+    }
+
+    // CSV 가져오기 런처
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            coroutineScope.launch {
+                val result = CsvUtil.importFromCSV(context, it)
+                if (result.isSuccess) {
+                    val cards = result.getOrNull() ?: emptyList()
+                    viewModel.insertCards(cards)
+                    showImportSuccess = true
+                } else {
+                    errorMessage = "가져오기 실패: ${result.exceptionOrNull()?.message}"
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -132,7 +197,11 @@ fun SettingsScreen(
                         title = "다크 모드",
                         subtitle = "어두운 테마 사용",
                         checked = isDarkModeEnabled,
-                        onCheckedChange = { isDarkModeEnabled = it }
+                        onCheckedChange = { enabled ->
+                            coroutineScope.launch {
+                                preferencesManager.setDarkMode(enabled)
+                            }
+                        }
                     )
 
                     HorizontalDivider(color = Color(0xFFEEEEEE))
@@ -142,6 +211,59 @@ fun SettingsScreen(
                         title = "언어",
                         subtitle = "한국어",
                         onClick = { /* TODO: 언어 설정 화면으로 이동 */ }
+                    )
+                }
+            }
+
+            // 데이터 관리 섹션
+            Text(
+                text = "데이터 관리",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF1F1F1F)
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column {
+                    SettingsMenuItem(
+                        icon = Icons.Default.Upload,
+                        title = "데이터 내보내기",
+                        subtitle = "명함 데이터를 CSV 파일로 저장",
+                        onClick = {
+                            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+                                .format(Date())
+                            exportLauncher.launch("slideit_cards_$timestamp.csv")
+                        }
+                    )
+
+                    HorizontalDivider(color = Color(0xFFEEEEEE))
+
+                    SettingsMenuItem(
+                        icon = Icons.Default.Download,
+                        title = "데이터 가져오기",
+                        subtitle = "CSV 파일에서 명함 데이터 불러오기",
+                        onClick = {
+                            importLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "application/csv", "*/*"))
+                        }
+                    )
+
+                    HorizontalDivider(color = Color(0xFFEEEEEE))
+
+                    SettingsMenuItem(
+                        icon = Icons.Default.Delete,
+                        title = "받은 명함 전체 삭제",
+                        subtitle = "명함 보관함의 모든 명함 삭제 (${receivedCards.size}장)",
+                        onClick = {
+                            if (receivedCards.isNotEmpty()) {
+                                showDeleteDialog = true
+                            } else {
+                                Toast.makeText(context, "삭제할 명함이 없습니다", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     )
                 }
             }
@@ -214,6 +336,60 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // 성공/에러 스낵바
+        errorMessage?.let { message ->
+            LaunchedEffect(message) {
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                errorMessage = null
+            }
+        }
+
+        if (showExportSuccess) {
+            LaunchedEffect(Unit) {
+                Toast.makeText(context, "데이터 내보내기 완료", Toast.LENGTH_SHORT).show()
+                showExportSuccess = false
+            }
+        }
+
+        if (showImportSuccess) {
+            LaunchedEffect(Unit) {
+                Toast.makeText(context, "데이터 가져오기 완료", Toast.LENGTH_SHORT).show()
+                showImportSuccess = false
+            }
+        }
+
+        // 명함 전체 삭제 확인 다이얼로그
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("명함 전체 삭제") },
+                text = { Text("받은 명함 ${receivedCards.size}장을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                receivedCards.forEach { card ->
+                                    viewModel.deleteCard(card)
+                                }
+                                Toast.makeText(context, "모든 명함이 삭제되었습니다", Toast.LENGTH_SHORT).show()
+                                showDeleteDialog = false
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFEF4444)
+                        )
+                    ) {
+                        Text("삭제")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("취소")
+                    }
+                }
+            )
         }
     }
 }

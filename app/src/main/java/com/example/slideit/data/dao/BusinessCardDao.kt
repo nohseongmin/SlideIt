@@ -80,4 +80,28 @@ interface BusinessCardDao {
      */
     @Query("DELETE FROM business_cards")
     suspend fun deleteAllCards()
+
+    /**
+     * 즐겨찾기 명함만 조회
+     */
+    @Query("SELECT * FROM business_cards WHERE isFavorite = 1 ORDER BY createdAt DESC")
+    fun getFavoriteCards(): Flow<List<BusinessCard>>
+
+    /**
+     * 카테고리별 명함 조회
+     */
+    @Query("SELECT * FROM business_cards WHERE category = :category ORDER BY createdAt DESC")
+    fun getCardsByCategory(category: String): Flow<List<BusinessCard>>
+
+    /**
+     * 모든 카테고리 조회
+     */
+    @Query("SELECT DISTINCT category FROM business_cards WHERE category != '' ORDER BY category")
+    fun getAllCategories(): Flow<List<String>>
+
+    /**
+     * 즐겨찾기 토글
+     */
+    @Query("UPDATE business_cards SET isFavorite = :isFavorite WHERE id = :cardId")
+    suspend fun toggleFavorite(cardId: String, isFavorite: Boolean)
 }

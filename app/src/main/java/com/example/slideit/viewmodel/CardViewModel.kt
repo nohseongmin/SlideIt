@@ -6,10 +6,17 @@ import androidx.lifecycle.viewModelScope
 import com.example.slideit.data.database.AppDatabase
 import com.example.slideit.data.model.BusinessCard
 import com.example.slideit.data.repository.BusinessCardRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -36,8 +43,21 @@ class CardViewModel(application: Application) : AndroidViewModel(application) {
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     // 검색 결과
-    private val _searchResults = MutableStateFlow<List<BusinessCard>>(emptyList())
-    val searchResults: StateFlow<List<BusinessCard>> = _searchResults.asStateFlow()
+    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+    val searchResults: StateFlow<List<BusinessCard>> = searchQuery
+        .debounce(300)
+        .flatMapLatest { query ->
+            if (query.isBlank()) {
+                flowOf(emptyList())
+            } else {
+                repository.searchCards(query)
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     init {
         val dao = AppDatabase.getDatabase(application).businessCardDao()
@@ -49,23 +69,30 @@ class CardViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * 검색어 업데이트
+     */
+    fun onSearchQueryChanged(query: String) {
+        _searchQuery.value = query
+    }
+
+    /**
      * 명함 추가
      */
-    fun insertCard(card: BusinessCard) = viewModelScope.launch {
+    suspend fun insertCard(card: BusinessCard) {
         repository.insertCard(card)
     }
 
     /**
      * 여러 명함 추가
      */
-    fun insertCards(cards: List<BusinessCard>) = viewModelScope.launch {
+    suspend fun insertCards(cards: List<BusinessCard>) {
         repository.insertCards(cards)
     }
 
     /**
      * 명함 수정
      */
-    fun updateCard(card: BusinessCard) = viewModelScope.launch {
+    suspend fun updateCard(card: BusinessCard) {
         repository.updateCard(card)
     }
 
@@ -91,19 +118,27 @@ class CardViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * 명함 검색
+     * 즐겨찾기 명함 조회
      */
-    fun searchCards(query: String) {
-        _searchQuery.value = query
-        if (query.isBlank()) {
-            _searchResults.value = emptyList()
-        } else {
-            viewModelScope.launch {
-                repository.searchCards(query).collect { results ->
-                    _searchResults.value = results
-                }
-            }
-        }
+    val favoriteCards: Flow<List<BusinessCard>> = repository.getFavoriteCards()
+
+    /**
+     * 모든 카테고리 조회
+     */
+    val allCategories: Flow<List<String>> = repository.getAllCategories()
+
+    /**
+     * 즐겨찾기 토글
+     */
+    fun toggleFavorite(cardId: String, isFavorite: Boolean) = viewModelScope.launch {
+        repository.toggleFavorite(cardId, isFavorite)
+    }
+
+    /**
+     * 카테고리별 명함 조회
+     */
+    fun getCardsByCategory(category: String): Flow<List<BusinessCard>> {
+        return repository.getCardsByCategory(category)
     }
 
     /**

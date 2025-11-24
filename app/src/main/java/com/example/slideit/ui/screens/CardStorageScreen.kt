@@ -13,9 +13,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.window.Dialog
 import com.example.slideit.data.model.BusinessCard
+import com.example.slideit.ui.components.CardRenderer
 import com.example.slideit.viewmodel.CardViewModel
 
 /**
@@ -43,25 +49,27 @@ fun CardStorageScreen(
     viewModel: CardViewModel = viewModel(),
     onNavigateToEditor: () -> Unit = {},
     onNavigateToEditCard: (BusinessCard) -> Unit = {},
-    onPickImage: () -> Unit = {}
+    onPickImage: () -> Unit = {},
+    onNavigateToCamera: () -> Unit = {}
 ) {
-    var searchQuery by remember { mutableStateOf("") }
+    val cardViewModel: CardViewModel = viewModel
     var selectedCardId by remember { mutableStateOf<String?>(null) }
     var showAddMenu by remember { mutableStateOf(false) }
+    var cardToPreview by remember { mutableStateOf<BusinessCard?>(null) }
 
-    // 받은 명함만 표시
-    val cards by viewModel.receivedCards.collectAsStateWithLifecycle(initialValue = emptyList())
+    // ViewModel로부터 상태 수집
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+    val receivedCards by viewModel.receivedCards.collectAsStateWithLifecycle(initialValue = emptyList())
 
-    val filteredCards = remember(searchQuery, cards) {
-        if (searchQuery.isBlank()) {
-            cards
-        } else {
-            cards.filter {
-                it.name.contains(searchQuery, ignoreCase = true) ||
-                        it.company.contains(searchQuery, ignoreCase = true)
-            }
-        }
+    // 표시할 카드 결정 (검색어 유무에 따라)
+    val cardsToShow = if (searchQuery.isBlank()) {
+        receivedCards
+    } else {
+        // 검색 결과에서 받은 명함만 필터링
+        searchResults.filter { !it.isMyCard }
     }
+
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -90,7 +98,7 @@ fun CardStorageScreen(
                     // 검색창
                     OutlinedTextField(
                         value = searchQuery,
-                        onValueChange = { searchQuery = it },
+                        onValueChange = { viewModel.onSearchQueryChanged(it) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("이름, 회사명으로 검색") },
                         leadingIcon = {
@@ -122,21 +130,23 @@ fun CardStorageScreen(
             ) {
                 item {
                     Text(
-                        text = "총 ${filteredCards.size}장의 명함",
+                        text = "총 ${cardsToShow.size}장의 명함",
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
                 }
 
-                items(filteredCards) { card ->
+                items(cardsToShow) { card ->
                     CardItem(
                         card = card,
                         isExpanded = selectedCardId == card.id,
+                        viewModel = cardViewModel,
                         onClick = {
                             selectedCardId = if (selectedCardId == card.id) null else card.id
                         },
                         onEdit = { onNavigateToEditCard(card) },
-                        onDelete = { viewModel.deleteCard(card) }
+                        onDelete = { viewModel.deleteCard(card) },
+                        onPreview = { cardToPreview = card }
                     )
                 }
             }
@@ -211,7 +221,41 @@ fun CardStorageScreen(
 
                     HorizontalDivider(color = Color(0xFFEEEEEE))
 
-                    // 사진으로 추가
+                    // 카메라로 촬영
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showAddMenu = false
+                                onNavigateToCamera()
+                            }
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.CameraAlt,
+                            contentDescription = "카메라로 촬영",
+                            tint = Color(0xFF90CBFB),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "카메라로 촬영",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "카메라로 명함을 촬영합니다",
+                                fontSize = 13.sp,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0xFFEEEEEE))
+
+                    // 갤러리에서 선택
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -223,15 +267,15 @@ fun CardStorageScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Default.Add,
-                            contentDescription = "사진으로 추가",
+                            Icons.Default.Image,
+                            contentDescription = "갤러리에서 선택",
                             tint = Color(0xFF90CBFB),
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
-                                text = "사진으로 추가",
+                                text = "갤러리에서 선택",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -245,6 +289,26 @@ fun CardStorageScreen(
                 }
             }
         }
+
+        // 명함 상세보기 다이얼로그
+        cardToPreview?.let { card ->
+            Dialog(
+                onDismissRequest = { cardToPreview = null }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CardRenderer(
+                        card = card,
+                        cardWidth = 300.dp,
+                        showRotated = false
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -252,11 +316,15 @@ fun CardStorageScreen(
 private fun CardItem(
     card: BusinessCard,
     isExpanded: Boolean,
+    viewModel: CardViewModel,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onPreview: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     val elevation by animateFloatAsState(
         targetValue = if (isExpanded) 8f else 2f,
         label = "cardElevation"
@@ -308,15 +376,31 @@ private fun CardItem(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = card.name,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(card.textColor)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = card.name,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(card.textColor)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            // 즐겨찾기 아이콘
+                            IconButton(
+                                onClick = { viewModel.toggleFavorite(card.id, !card.isFavorite) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    if (card.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                                    contentDescription = "즐겨찾기",
+                                    tint = if (card.isFavorite) Color(0xFFFFD700) else Color(card.textColor).copy(alpha = 0.5f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "${card.department} | ${card.position}",
@@ -366,6 +450,20 @@ private fun CardItem(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
+                        // 상세보기 버튼
+                        Button(
+                            onClick = onPreview,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF90CBFB)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("명함 크게 보기")
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         // 편집/삭제 버튼
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -388,7 +486,7 @@ private fun CardItem(
                             }
 
                             OutlinedButton(
-                                onClick = onDelete,
+                                onClick = { showDeleteDialog = true },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = Color(0xFFEF4444)
@@ -424,6 +522,33 @@ private fun CardItem(
                 )
             }
         }
+
+        // 삭제 확인 다이얼로그
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("명함 삭제") },
+                text = { Text("'${card.name}'님의 명함을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            onDelete()
+                            showDeleteDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFEF4444)
+                        )
+                    ) {
+                        Text("삭제")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("취소")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -453,4 +578,3 @@ private fun InfoRow(
         )
     }
 }
-

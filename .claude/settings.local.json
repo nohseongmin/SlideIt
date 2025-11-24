@@ -1,30 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./gradlew clean:*)",
-      "Bash(./gradlew assembleDebug:*)",
-      "Bash(./gradlew installDebug:*)",
-      "WebFetch(domain:poke-holo.simey.me)",
-      "Bash(nul)",
-      "Bash(.gradlew.bat assembleDebug)",
-      "Bash(gradlew assembleDebug:*)",
-      "Bash(cmd /c gradlew.bat assembleDebug)",
-      "WebFetch(domain:www.notion.so)",
-      "Bash(gradlew.bat assembleDebug:*)",
-      "Bash(cmd /c \"gradlew.bat assembleDebug\")",
-      "Bash(cmd /c \"gradlew.bat clean assembleDebug\")",
-      "Bash(cmd /c \"gradlew.bat clean\")",
-      "Bash(cmd /c \"gradlew.bat --stop\")",
-      "Bash(powershell -Command \"& { cd ''C:\\Users\\sm937\\AndroidStudioProjects\\SlideIT''; .\\gradlew.bat assembleDebug }\")",
-      "Bash(dir:*)",
-      "Bash(cmd /c \"gradlew.bat build\")",
-      "Bash(cmd /c \"dir /s /b *.apk\")",
-      "Bash(adb devices:*)",
-      "Bash(git init:*)",
-      "Bash(git remote add:*)",
+      "Bash(cmd /c:*)",
+      "Bash(cat:*)",
       "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enableAllProjectMcpServers": true
 }

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.slideit.data.model.BusinessCard
 import com.example.slideit.viewmodel.CardViewModel
 
 /**
@@ -32,7 +33,7 @@ import com.example.slideit.viewmodel.CardViewModel
 fun ProfileScreen(
     modifier: Modifier = Modifier,
     viewModel: CardViewModel = viewModel(),
-    onNavigateToEditor: (Boolean) -> Unit = {},
+    onNavigateToEditor: (Boolean, BusinessCard?) -> Unit = { _, _ -> },
     onNavigateToSettings: () -> Unit = {}
 ) {
     val myCard by viewModel.firstMyCard.collectAsStateWithLifecycle(initialValue = null)
@@ -68,7 +69,7 @@ fun ProfileScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "홍",
+                        text = myCard?.name?.firstOrNull()?.toString() ?: "?",
                         fontSize = 32.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF90CBFB)
@@ -111,14 +112,14 @@ fun ProfileScreen(
                         icon = Icons.Default.Edit,
                         title = "내 명함 수정",
                         subtitle = "내 명함 정보 수정",
-                        onClick = { onNavigateToEditor(true) }
+                        onClick = { onNavigateToEditor(true, myCard) }
                     )
                 } else {
                     MenuItem(
                         icon = Icons.Default.Add,
                         title = "내 명함 만들기",
                         subtitle = "나만의 명함 생성",
-                        onClick = { onNavigateToEditor(true) }
+                        onClick = { onNavigateToEditor(true, null) }
                     )
                 }
 
@@ -138,7 +139,7 @@ fun ProfileScreen(
 
         // 버전 정보
         Text(
-            text = "Slide It! v1.0.0",
+            text = "Slide It! v0.0.4",
             fontSize = 12.sp,
             color = Color.Gray,
             modifier = Modifier

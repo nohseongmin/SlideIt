@@ -9,10 +9,12 @@ import com.example.slideit.data.model.BusinessCard
 
 /**
  * Room 데이터베이스
+ *
+ * Version 3: editorType, canvasData, thumbnailPath 필드 추가
  */
 @Database(
     entities = [BusinessCard::class],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -29,7 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "slideit_database"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance

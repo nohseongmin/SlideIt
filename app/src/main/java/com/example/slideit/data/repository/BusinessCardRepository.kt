@@ -68,4 +68,24 @@ class BusinessCardRepository(private val dao: BusinessCardDao) {
      * 모든 명함 삭제
      */
     suspend fun deleteAllCards() = dao.deleteAllCards()
+
+    /**
+     * 즐겨찾기 명함만 조회
+     */
+    fun getFavoriteCards(): Flow<List<BusinessCard>> = dao.getFavoriteCards()
+
+    /**
+     * 카테고리별 명함 조회
+     */
+    fun getCardsByCategory(category: String): Flow<List<BusinessCard>> = dao.getCardsByCategory(category)
+
+    /**
+     * 모든 카테고리 조회
+     */
+    fun getAllCategories(): Flow<List<String>> = dao.getAllCategories()
+
+    /**
+     * 즐겨찾기 토글
+     */
+    suspend fun toggleFavorite(cardId: String, isFavorite: Boolean) = dao.toggleFavorite(cardId, isFavorite)
 }
