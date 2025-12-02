@@ -2,19 +2,35 @@ package com.example.slideit.ui.screens
 
 import android.content.Intent
 import android.widget.Toast
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,18 +46,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import com.example.slideit.data.model.BusinessCard
 import com.example.slideit.ui.components.CardRenderer
-import com.example.slideit.util.BitmapConverter
+import com.example.slideit.util.ShareUtil
 import com.example.slideit.util.VCardUtil
 import com.example.slideit.viewmodel.CardViewModel
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
-import androidx.core.content.FileProvider
-import androidx.compose.ui.layout.ContentScale
 
 /**
  * 명함 공유 화면 - 3D 홀로그래픽 효과
@@ -62,6 +74,7 @@ fun CardShareScreen(
     val glareOpacityState = remember { mutableFloatStateOf(0f) }
     val targetTranslationXState = remember { mutableFloatStateOf(0f) }
     val targetTranslationYState = remember { mutableFloatStateOf(0f) }
+    val sendAnimationY = remember { Animatable(0f) }
 
     // 스프링 애니메이션으로 부드럽게 전환
     val rotationX by animateFloatAsState(
@@ -193,6 +206,9 @@ fun CardShareScreen(
                         CardRenderer(
                             card = card,
                             modifier = Modifier
+                                .graphicsLayer {
+                                    this.translationY = translationY + sendAnimationY.value
+                                }
                                 .shadow(
                                     elevation = 24.dp,
                                     shape = RoundedCornerShape(16.dp),
@@ -201,10 +217,10 @@ fun CardShareScreen(
                                     clip = false
                                 )
                                 .pointerInput(Unit) {
-                                    var totalDrag = Offset(0f, 0f)
+                                    var totalDrag = Offset.Zero
                                     detectDragGestures(
                                         onDragStart = {
-                                            totalDrag = Offset(0f, 0f)
+                                            totalDrag = Offset.Zero
                                             glareOpacityState.value = 1f
                                         },
                                         onDragEnd = {
@@ -218,19 +234,15 @@ fun CardShareScreen(
                                                                 it.write(vCardString.toByteArray())
                                                             }
 
-                                                            val vcfUri = FileProvider.getUriForFile(
-                                                                context,
-                                                                context.applicationContext.packageName + ".fileprovider",
-                                                                vcfFile
+                                                            val shareIntent = ShareUtil.createShareIntent(context, vcfFile, "text/vcard")
+                                                            context.startActivity(shareIntent)
+                                                            
+                                                            sendAnimationY.animateTo(
+                                                                targetValue = -2000f,
+                                                                animationSpec = tween(durationMillis = 500, easing = FastOutLinearInEasing)
                                                             )
+                                                            sendAnimationY.snapTo(0f)
 
-                                                            val shareIntent = Intent().apply {
-                                                                action = Intent.ACTION_SEND
-                                                                putExtra(Intent.EXTRA_STREAM, vcfUri)
-                                                                type = "text/vcard"
-                                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                            }
-                                                            context.startActivity(Intent.createChooser(shareIntent, "Share Business Card"))
 
                                                         } catch (e: IOException) {
                                                             e.printStackTrace()
@@ -246,7 +258,7 @@ fun CardShareScreen(
                                             glareOpacityState.value = 0f
                                         },
                                         onDragCancel = {
-                                            totalDrag = Offset(0f, 0f)
+                                            totalDrag = Offset.Zero
                                             targetRotationXState.value = 0f
                                             targetRotationYState.value = 0f
                                             targetTranslationXState.value = 0f
@@ -274,7 +286,6 @@ fun CardShareScreen(
                             rotationX = rotationX,
                             rotationY = rotationY,
                             translationX = translationX,
-                            translationY = translationY,
                             glareX = glareX,
                             glareY = glareY,
                             glareOpacity = opacity,
