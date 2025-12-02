@@ -278,7 +278,7 @@ fun CanvasCardRenderer(
     }
 
     val cardRenderWidth = cardWidth
-    val cardRenderHeight = (cardWidth.value * (canvasData.height / canvasData.width)).dp
+    val cardRenderHeight = (cardWidth.value * (680.0f / 1080.0f)).dp
     val density = LocalDensity.current
 
     Box(
@@ -321,9 +321,11 @@ fun CanvasCardRenderer(
                     val elementYOffsetDp = cardRenderHeight * cardElement.y
                     val elementWidthDp = cardRenderWidth * cardElement.width
                     val elementHeightDp = cardRenderHeight * cardElement.height
-                    
+
+                    // Scale fontSize based on the card's overall scale factor
+                    val scaleFactor = cardRenderWidth.value / canvasData.width
                     val fontSize = if (cardElement is CardElement.TextElement) {
-                        cardElement.fontSize * (elementWidthDp.value / 680f) // Scale font relative to the original card width (680f)
+                        cardElement.fontSize * scaleFactor
                     } else {
                         16f // Default font size for non-text elements (should not be used)
                     }

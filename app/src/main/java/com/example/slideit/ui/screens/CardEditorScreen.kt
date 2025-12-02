@@ -360,6 +360,8 @@ fun CardEditorScreen(
                                 textColor = selectedTextColor,
                                 accentColor = selectedAccentColor,
                                 templateId = selectedTemplateId,
+                                editorType = "SIMPLE",
+                                canvasData = null,
                                 isMyCard = isMyCard,
                                 lastModifiedAt = System.currentTimeMillis()
                             ) ?: BusinessCard(
@@ -374,6 +376,7 @@ fun CardEditorScreen(
                                 textColor = selectedTextColor,
                                 accentColor = selectedAccentColor,
                                 templateId = selectedTemplateId,
+                                editorType = "SIMPLE",
                                 isMyCard = isMyCard,
                                 createdAt = System.currentTimeMillis(),
                                 lastModifiedAt = System.currentTimeMillis()

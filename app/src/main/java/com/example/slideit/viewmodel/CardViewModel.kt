@@ -36,32 +36,20 @@ class CardViewModel(application: Application) : AndroidViewModel(application) {
     val receivedCards: Flow<List<BusinessCard>>
 
     // 내 명함 (공유용)
-    private val _refreshTrigger = MutableStateFlow(0)
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val firstMyCard: Flow<BusinessCard?> = _refreshTrigger.flatMapLatest {
-        repository.getFirstMyCard()
-    }
+    lateinit var firstMyCard: Flow<BusinessCard?>
 
     // 검색 쿼리
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     // 검색 결과
-    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-    val searchResults: StateFlow<List<BusinessCard>> = searchQuery
-        .debounce(300)
-        .flatMapLatest { query ->
-            if (query.isBlank()) {
-                flowOf(emptyList())
-            } else {
-                repository.searchCards(query)
-            }
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    lateinit var searchResults: StateFlow<List<BusinessCard>>
+
+    // 즐겨찾기 명함
+    lateinit var favoriteCards: Flow<List<BusinessCard>>
+
+    // 모든 카테고리
+    lateinit var allCategories: Flow<List<String>>
 
     init {
         val dao = AppDatabase.getDatabase(application).businessCardDao()
@@ -69,13 +57,25 @@ class CardViewModel(application: Application) : AndroidViewModel(application) {
         allCards = repository.getAllCards()
         myCards = repository.getMyCards()
         receivedCards = repository.getReceivedCards()
-    }
+        firstMyCard = repository.getFirstMyCard()
+        favoriteCards = repository.getFavoriteCards()
+        allCategories = repository.getAllCategories()
 
-    /**
-     * 내 명함 데이터 강제 새로고침
-     */
-    fun refreshMyCard() {
-        _refreshTrigger.value++
+        @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+        searchResults = searchQuery
+            .debounce(300)
+            .flatMapLatest { query ->
+                if (query.isBlank()) {
+                    flowOf(emptyList())
+                } else {
+                    repository.searchCards(query)
+                }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
     }
 
     /**
@@ -129,16 +129,6 @@ class CardViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun getCardById(cardId: String): BusinessCard? {
         return repository.getCardById(cardId)
     }
-
-    /**
-     * 즐겨찾기 명함 조회
-     */
-    val favoriteCards: Flow<List<BusinessCard>> = repository.getFavoriteCards()
-
-    /**
-     * 모든 카테고리 조회
-     */
-    val allCategories: Flow<List<String>> = repository.getAllCategories()
 
     /**
      * 즐겨찾기 토글

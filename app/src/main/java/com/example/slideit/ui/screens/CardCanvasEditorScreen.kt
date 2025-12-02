@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -100,8 +101,8 @@ fun CardCanvasEditorScreen(
                                 val canvasData = CanvasCardData(
                                     elements = portraitElements,
                                     backgroundColor = backgroundColor,
-                                    width = 680f, // Portrait width
-                                    height = 1080f // Portrait height
+                                    width = 1080f, // Landscape width
+                                    height = 680f // Landscape height
                                 )
 
                                 val cardToSave = cardToEdit?.copy(
@@ -127,7 +128,6 @@ fun CardCanvasEditorScreen(
                                 cardViewModel.insertCard(cardToSave)
 
                                 if (isMyCard) {
-                                    cardViewModel.refreshMyCard()
                                     onSaveMyCard()
                                 } else {
                                     onNavigateBack()
@@ -237,7 +237,7 @@ fun CanvasArea(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .aspectRatio(680f / 1080f) // Editor is portrait
+            .aspectRatio(1080f / 680f) // Editor is landscape (wider than tall)
             .clip(RoundedCornerShape(16.dp))
             .background(Color(backgroundColor))
             .border(2.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))

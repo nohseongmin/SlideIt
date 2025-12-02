@@ -237,11 +237,11 @@ class CanvasEditorViewModel(application: Application) : AndroidViewModel(applica
      * 캔버스 데이터를 CardElement 리스트로 변환 (편집기 -> 저장)
      */
     fun toCardElements(): List<CardElement> {
-        // Editor is portrait (680w x 1080h)
-        // Saved data is portrait (680w x 1080h)
+        // Editor is landscape (1080w x 680h)
+        // Saved data is landscape (1080w x 680h)
         // No coordinate transformation needed, just relative conversion.
-        val cardWidth = 680f
-        val cardHeight = 1080f
+        val cardWidth = 1080f
+        val cardHeight = 680f
 
         return elements.map { canvasElement ->
             val relativeX = canvasElement.position.x / cardWidth
@@ -262,8 +262,8 @@ class CanvasEditorViewModel(application: Application) : AndroidViewModel(applica
      */
     fun fromCardElements(cardElements: List<CardElement>) {
         _elements.clear()
-        val cardWidth = 680f
-        val cardHeight = 1080f
+        val cardWidth = 1080f
+        val cardHeight = 680f
 
         cardElements.forEach { cardElement ->
             val absoluteX = cardElement.x * cardWidth

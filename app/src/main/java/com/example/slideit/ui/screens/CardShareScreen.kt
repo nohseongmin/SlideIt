@@ -217,12 +217,12 @@ fun CardShareScreen(
                                         }
                                     ) { change, _ ->
                                         change.consume()
-        
+
                                         val centerX = size.width / 2f
                                         val centerY = size.height / 2f
                                         val x = change.position.x
                                         val y = change.position.y
-        
+
                                         targetRotationXState.value = ((y - centerY) / centerY) * -25f
                                         targetRotationYState.value = ((x - centerX) / centerX) * 25f
                                         targetGlareXState.value = (x / size.width) * 100f
