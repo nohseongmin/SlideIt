@@ -2,6 +2,7 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 캐시 디렉토리 (공유용 임시 파일) -->
     <cache-path name="shared_images" path="shared_images/" />
+    <cache-path name="cache" path="." />
 
     <!-- 내부 저장소 (명함 이미지) -->
     <files-path name="cards" path="cards/" />

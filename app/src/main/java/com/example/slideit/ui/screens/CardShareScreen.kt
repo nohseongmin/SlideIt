@@ -34,9 +34,13 @@ import coil.compose.AsyncImage
 import com.example.slideit.data.model.BusinessCard
 import com.example.slideit.ui.components.CardRenderer
 import com.example.slideit.util.BitmapConverter
+import com.example.slideit.util.VCardUtil
 import com.example.slideit.viewmodel.CardViewModel
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import androidx.core.content.FileProvider
 import androidx.compose.ui.layout.ContentScale
 
 /**
@@ -197,11 +201,44 @@ fun CardShareScreen(
                                     clip = false
                                 )
                                 .pointerInput(Unit) {
+                                    var totalDrag = Offset(0f, 0f)
                                     detectDragGestures(
                                         onDragStart = {
+                                            totalDrag = Offset(0f, 0f)
                                             glareOpacityState.value = 1f
                                         },
                                         onDragEnd = {
+                                            if (totalDrag.y < -200) { // Swipe up
+                                                myCard?.let { cardToShare ->
+                                                    coroutineScope.launch {
+                                                        try {
+                                                            val vCardString = VCardUtil.createVCardString(cardToShare)
+                                                            val vcfFile = File(context.cacheDir, "business_card.vcf")
+                                                            FileOutputStream(vcfFile).use {
+                                                                it.write(vCardString.toByteArray())
+                                                            }
+
+                                                            val vcfUri = FileProvider.getUriForFile(
+                                                                context,
+                                                                context.applicationContext.packageName + ".fileprovider",
+                                                                vcfFile
+                                                            )
+
+                                                            val shareIntent = Intent().apply {
+                                                                action = Intent.ACTION_SEND
+                                                                putExtra(Intent.EXTRA_STREAM, vcfUri)
+                                                                type = "text/vcard"
+                                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                            }
+                                                            context.startActivity(Intent.createChooser(shareIntent, "Share Business Card"))
+
+                                                        } catch (e: IOException) {
+                                                            e.printStackTrace()
+                                                            Toast.makeText(context, "Error creating share file", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                }
+                                            }
                                             targetRotationXState.value = 0f
                                             targetRotationYState.value = 0f
                                             targetTranslationXState.value = 0f
@@ -209,14 +246,16 @@ fun CardShareScreen(
                                             glareOpacityState.value = 0f
                                         },
                                         onDragCancel = {
+                                            totalDrag = Offset(0f, 0f)
                                             targetRotationXState.value = 0f
                                             targetRotationYState.value = 0f
                                             targetTranslationXState.value = 0f
                                             targetTranslationYState.value = 0f
                                             glareOpacityState.value = 0f
                                         }
-                                    ) { change, _ ->
+                                    ) { change, dragAmount ->
                                         change.consume()
+                                        totalDrag = totalDrag.plus(dragAmount)
 
                                         val centerX = size.width / 2f
                                         val centerY = size.height / 2f
