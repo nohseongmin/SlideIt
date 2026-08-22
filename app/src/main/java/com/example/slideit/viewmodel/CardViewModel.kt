@@ -106,6 +106,9 @@ class CardViewModel(application: Application) : AndroidViewModel(application) {
      * 명함 수정
      */
     suspend fun updateCard(card: BusinessCard) {
+        if (card.isMyCard) {
+            repository.unselectOtherMyCards(card.id)
+        }
         repository.updateCard(card)
     }
 
